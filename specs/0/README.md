@@ -12,6 +12,7 @@ Stub specifications for WebNotary release 0. Detail via SpecKit workflows before
 | CT inventory pipeline | `0.006-ct-inventory-pipeline` | `0.006-ct-inventory-pipeline` | 0.001 |
 | CT gate + trust policy | `0.007-ct-gate-and-trust-policy` | `0.007-ct-gate-and-trust-policy` | 0.005, 0.006 |
 | Chrome extension | `0.008-chrome-extension` | `0.008-chrome-extension` | backend E2E |
+| Public API custom domain | `0.009-api-custom-domain` | `0.009-api-custom-domain` | 0.002–0.003, Route53 zone |
 
 Product source of truth for intent: `/webnotary.md`  
 Engineering law: `/.specify/memory/constitution.md`

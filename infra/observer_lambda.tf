@@ -83,6 +83,10 @@ resource "aws_lambda_function" "observer" {
     aws_cloudwatch_log_group.observer,
     aws_iam_role_policy.observer,
   ]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_lambda_event_source_mapping" "verify_queue" {

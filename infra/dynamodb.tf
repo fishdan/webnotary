@@ -28,4 +28,8 @@ resource "aws_dynamodb_table" "webnotary" {
   server_side_encryption {
     enabled = true
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

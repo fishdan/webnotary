@@ -1,6 +1,10 @@
 resource "aws_s3_bucket" "evidence" {
   bucket        = "${local.name_prefix}evidence-${data.aws_caller_identity.current.account_id}"
   force_destroy = var.evidence_force_destroy
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "evidence" {

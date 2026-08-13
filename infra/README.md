@@ -1,58 +1,77 @@
-# WebNotary AWS foundation (feature 0.002)
+# WebNotary AWS infrastructure
 
-Flat Terraform root module. **Local state** (no remote backend yet). **No alerts** in this feature.
+Flat Terraform root module. **Local state** (no remote backend yet).
+
+## Safety: no deletes
+
+Terraform changes for WebNotary must be **add/update only**.
+
+Before every apply:
+
+```bash
+cd infra
+terraform plan -out=tfplan
+# Fail if any destroy/replace is planned:
+terraform show -json tfplan | python3 -c '
+import json,sys
+p=json.load(sys.stdin)
+bad=[]
+for c in p.get("resource_changes",[]):
+  acts=c.get("change",{}).get("actions",[])
+  if "delete" in acts or acts==["create","delete"] or acts==["delete","create"]:
+    bad.append((c["address"], acts))
+if bad:
+  print("REFUSING APPLY — destroy/replace planned:")
+  for a,acts in bad: print(" ", a, acts)
+  sys.exit(1)
+print("OK: no destroy/replace actions")
+'
+terraform apply tfplan   # only if the check passed
+```
+
+Critical resources use `lifecycle.prevent_destroy = true`. The `webnotary.org` hosted zone is a **data source** only (never created/destroyed by this stack).
 
 ## Prerequisites
 
 - Terraform >= 1.5
-- AWS credentials with permission to create DynamoDB, SQS, S3, API Gateway, CloudWatch Logs
-- IAM role creation is **not** required for this feature
-
-Load credentials without committing them. Example if using `.secrets/aws.keys`:
-
-```bash
-# Parse locally; do not echo secrets
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_DEFAULT_REGION=us-east-1
-```
-
-Or use a named profile: `export AWS_PROFILE=webnotary`.
+- AWS credentials (Albert) with API Gateway, ACM, Route53 record, Lambda, DynamoDB, SQS, S3 permissions
+- Existing Route53 hosted zone for `webnotary.org`
 
 ## Usage
 
 ```bash
 cd infra
-cp terraform.tfvars.example terraform.tfvars   # optional overrides
 terraform init
-terraform plan
-terraform apply
+terraform plan -out=tfplan
+# run destroy-guard above
+terraform apply tfplan
 terraform output
 ```
 
-## What this creates
+## Public API domain (0.009)
 
-- DynamoDB `${project}-${env}-table` (`pk`/`sk`, On-Demand, TTL `expiresAt`, PITR)
-- SQS verify queue + DLQ
-- Private evidence S3 bucket
-- HTTP API shell (throttle defaults 50 rps / burst 100; routes added in 0.003)
-- CloudWatch log groups for future lookup/observer functions
+- Hostname: `api.webnotary.org`
+- Check URL: `https://api.webnotary.org/v1/check`
+- ACM DNS validation + API Gateway custom domain + Route53 A/AAAA aliases
 
-## Explicitly not created
+## What exists
+
+- DynamoDB, SQS verify+DLQ, evidence S3, HTTP API
+- Lookup / observer / CT-ingest Lambdas
+- Custom domain `api.webnotary.org`
+
+## Explicitly not created here
 
 - VPC / EC2 / ECS / ALB / NAT
-- Route53 / ACM / CloudFront
-- Lambda function code
-- Lambda IAM roles/policies (deferred to 0.003 / 0.005)
+- Apex/`www` CloudFront website (deferred)
 - SNS / CloudWatch alarms / AWS Budgets
+- Ownership of the Route53 hosted zone itself
 
-# Lambda lookup (`POST /v1/check`)
-
-Before `terraform apply` when Lambda code changes:
+# Lambda builds before apply
 
 ```bash
 cd packages/lookup-api && npm ci && npm test && npm run build
+cd ../verification-worker && npm ci && npm test && npm run build
+cd ../ct-ingest && npm ci && npm test && npm run build
 cd ../../infra && terraform apply
 ```
-
-Outputs include `check_url`.

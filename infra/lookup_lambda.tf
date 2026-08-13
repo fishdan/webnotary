@@ -87,6 +87,10 @@ resource "aws_lambda_function" "lookup" {
     aws_cloudwatch_log_group.lookup,
     aws_iam_role_policy.lookup,
   ]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_apigatewayv2_integration" "lookup" {

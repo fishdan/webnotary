@@ -158,3 +158,13 @@
   - Inventory FP + clean host → `unknown`, pending + `CT_SEEN`.
   - `example.com` + non-observed FP → `conflict`; known observed FP → `valid`.
 - Follow-up: PR when requested; then 0.008 Chrome extension.
+
+## 2026-08-13 Update – Public API domain api.webnotary.org (0.009)
+
+- Summary: Hooked existing HTTP API to `https://api.webnotary.org` via Terraform add-only changes. Zone `webnotary.org` is a data source only (not owned/destroyed by Terraform).
+- Branch: `0.009-api-custom-domain`
+- Infra: `domain.tf` — ACM DNS cert, API Gateway custom domain + mapping, Route53 A/AAAA aliases; `prevent_destroy` on critical resources; `evidence_force_destroy` default false; destroy-guard documented in `infra/README.md`.
+- Apply: **7 added, 1 changed, 0 destroyed** (S3 force_destroy true→false).
+- Smoke: `POST https://api.webnotary.org/v1/check` → `{"status":"valid"}` for known observed example.com FP; garbage on fresh host → `unknown`. Legacy execute-api URL still works.
+- Out of scope still: apex/www CloudFront site.
+- Follow-up: PR when requested; then 0.008 extension can target the public hostname.

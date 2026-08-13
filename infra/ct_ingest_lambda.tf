@@ -67,6 +67,10 @@ resource "aws_lambda_function" "ct_ingest" {
     aws_cloudwatch_log_group.ct_ingest,
     aws_iam_role_policy.ct_ingest,
   ]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "ct_ingest_daily" {
