@@ -167,4 +167,62 @@ describe("handleCheck", () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ status: "unknown" });
   });
+
+  it("acquireMode sync-observes unknown and returns valid without needing inventory", async () => {
+    const store: DomainCertStore = {
+      getStatus: vi.fn().mockResolvedValue({ found: false }),
+      listSiblings: vi.fn().mockResolvedValue([]),
+    };
+    const scheduler = { tryEnqueue: vi.fn() };
+    const upsertObserved = { upsert: vi.fn().mockResolvedValue(undefined) };
+    const acquireFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: "valid",
+      observation: { certificateSha256: FP },
+    });
+
+    const res = await handleCheck(
+      eventWithBody({ hostname: "example.com", certificateSha256: FP }),
+      {
+        store,
+        inventory: inventory(false),
+        scheduler,
+        acquireMode: true,
+        upsertObserved,
+        acquireFn,
+      },
+    );
+
+    expect(JSON.parse(res.body as string)).toEqual({ status: "valid" });
+    expect(acquireFn).toHaveBeenCalled();
+    expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("acquireMode enqueues async when acquire times out", async () => {
+    const store: DomainCertStore = {
+      getStatus: vi.fn().mockResolvedValue({ found: false }),
+      listSiblings: vi.fn().mockResolvedValue([]),
+    };
+    const scheduler = { tryEnqueue: vi.fn().mockResolvedValue(true) };
+    const upsertObserved = { upsert: vi.fn() };
+    const acquireFn = vi.fn().mockResolvedValue({
+      ok: false,
+      reason: "timeout",
+    });
+
+    const res = await handleCheck(
+      eventWithBody({ hostname: "fresh.example", certificateSha256: FP }),
+      {
+        store,
+        inventory: inventory(false),
+        scheduler,
+        acquireMode: true,
+        upsertObserved,
+        acquireFn,
+      },
+    );
+
+    expect(JSON.parse(res.body as string)).toEqual({ status: "unknown" });
+    expect(scheduler.tryEnqueue).toHaveBeenCalledWith("fresh.example", FP);
+  });
 });
