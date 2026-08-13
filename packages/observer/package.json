@@ -1,0 +1,31 @@
+{
+  "name": "@webnotary/observer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "webnotary-observer": "./dist/cli.js"
+  },
+  "main": "./dist/observe.js",
+  "types": "./dist/observe.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/observe.d.ts",
+      "import": "./dist/observe.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:deps && tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build:deps": "npm run build --prefix ../data-model",
+    "test": "vitest run",
+    "observe": "npm run build && node dist/cli.js"
+  },
+  "dependencies": {
+    "@webnotary/data-model": "file:../data-model"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

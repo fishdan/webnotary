@@ -1,28 +1,9 @@
 # Notes: TLS Observer
 
-## Source map
+## Milestone use
 
-- `webnotary.md` — Observer Behavior; Steps 4–5; Initial Development Milestone
-- Constitution — VII, XXIII, XXVI
+1. `webnotary-observer example.com` → get `certificateSha256`
+2. Put DomainCertificateState with `status=SINGLE_OBSERVED`
+3. `POST /v1/check` → `valid`
 
-## Observation sketch
-
-```json
-{
-  "hostname": "accounts.google.com",
-  "remoteIp": "...",
-  "observedAt": "...",
-  "tlsValid": true,
-  "certificateSha256": "...",
-  "spkiSha256": "...",
-  "notBefore": "...",
-  "notAfter": "...",
-  "issuer": "...",
-  "sans": []
-}
-```
-
-## Dependencies
-
-- Enables: 0.005
-- Independent of: 0.006–0.008
+Lambda packaging deferred to 0.005.
