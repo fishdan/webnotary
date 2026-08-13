@@ -36,9 +36,14 @@ export const mapStatus = toPublicStatus;
 export function shouldEnqueueVerification(input: {
   publicStatus: PublicStatus;
   inventoryKnown: boolean;
+  /** When true, unknown checks may enqueue without CT inventory (acquire / bootstrap mode). */
+  acquireMode?: boolean;
 }): boolean {
-  return input.publicStatus === "unknown" && input.inventoryKnown === true;
+  if (input.publicStatus !== "unknown") return false;
+  if (input.acquireMode) return true;
+  return input.inventoryKnown === true;
 }
+
 
 /** Statuses that mean WebNotary has independently observed a cert for the host. */
 export const OBSERVED_TRUST_STATUSES: ReadonlySet<DomainCertStatus> = new Set([

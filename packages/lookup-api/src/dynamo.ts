@@ -42,6 +42,20 @@ export interface CtSeenStamper {
   stamp(hostname: string, certificateSha256: string): Promise<void>;
 }
 
+export interface ObservedCertUpserter {
+  /** Independent observation trust write — never call from client-only paths. */
+  upsert(input: {
+    hostname: string;
+    certificateSha256: string;
+    spkiSha256: string;
+    notBefore: string;
+    notAfter: string;
+    issuer: string;
+    observedAt: string;
+    evidenceKey?: string;
+  }): Promise<void>;
+}
+
 export interface VerificationScheduler {
   /** @returns true if this caller created pending and enqueued */
   tryEnqueue(hostname: string, requestedCertificateSha256: string): Promise<boolean>;
@@ -215,6 +229,53 @@ export function createDynamoCtSeenStamper(
         }
         throw err;
       }
+    },
+  };
+}
+
+export function createDynamoObservedCertUpserter(
+  tableName: string,
+  client?: DynamoDBDocumentClient,
+): ObservedCertUpserter {
+  const dynamo = docClient(client);
+  return {
+    async upsert(input) {
+      const keys = hostCertKeys(input.hostname, input.certificateSha256);
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: tableName,
+          Key: { pk: keys.pk, sk: keys.sk },
+          UpdateExpression: `
+            SET entityType = :entityType,
+                hostname = :hostname,
+                certificateSha256 = :fp,
+                spkiSha256 = :spki,
+                #status = :status,
+                notBefore = :notBefore,
+                notAfter = :notAfter,
+                issuer = :issuer,
+                firstObserved = if_not_exists(firstObserved, :observedAt),
+                lastObserved = :observedAt,
+                lastEvidenceS3Key = if_not_exists(lastEvidenceS3Key, :evidenceKey),
+                updatedAt = :observedAt
+            ADD observationCount :one, observerCount :one
+          `,
+          ExpressionAttributeNames: { "#status": "status" },
+          ExpressionAttributeValues: {
+            ":entityType": "DOMAIN_CERT",
+            ":hostname": input.hostname,
+            ":fp": input.certificateSha256,
+            ":spki": input.spkiSha256,
+            ":status": "SINGLE_OBSERVED",
+            ":notBefore": input.notBefore,
+            ":notAfter": input.notAfter,
+            ":issuer": input.issuer,
+            ":observedAt": input.observedAt,
+            ":evidenceKey": input.evidenceKey ?? "acquire/inline",
+            ":one": 1,
+          },
+        }),
+      );
     },
   };
 }

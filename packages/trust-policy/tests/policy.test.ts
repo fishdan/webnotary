@@ -38,6 +38,23 @@ describe("shouldEnqueueVerification", () => {
       shouldEnqueueVerification({ publicStatus: "conflict", inventoryKnown: true }),
     ).toBe(false);
   });
+
+  it("bypasses inventory requirement in acquireMode", () => {
+    expect(
+      shouldEnqueueVerification({
+        publicStatus: "unknown",
+        inventoryKnown: false,
+        acquireMode: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnqueueVerification({
+        publicStatus: "valid",
+        inventoryKnown: false,
+        acquireMode: true,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("detectConflictFromSiblings", () => {

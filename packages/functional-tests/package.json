@@ -1,0 +1,23 @@
+{
+  "name": "@webnotary/functional-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "webnotary-functional-test": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "npm run build:deps && tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build:deps": "npm run build --prefix ../observer",
+    "functional": "npm run build && node dist/cli.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@webnotary/observer": "file:../observer"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

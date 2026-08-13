@@ -70,16 +70,18 @@ resource "aws_lambda_function" "lookup" {
   handler       = "handler.handler"
   runtime       = "nodejs20.x"
   architectures = ["x86_64"]
-  timeout       = 10
-  memory_size   = 256
+  timeout       = 15
+  memory_size   = 512
 
   filename         = data.archive_file.lookup_lambda.output_path
   source_code_hash = data.archive_file.lookup_lambda.output_base64sha256
 
   environment {
     variables = {
-      TABLE_NAME       = aws_dynamodb_table.webnotary.name
-      VERIFY_QUEUE_URL = aws_sqs_queue.verify.url
+      TABLE_NAME           = aws_dynamodb_table.webnotary.name
+      VERIFY_QUEUE_URL     = aws_sqs_queue.verify.url
+      ACQUIRE_MODE         = var.acquire_mode ? "true" : "false"
+      ACQUIRE_TIMEOUT_MS   = tostring(var.acquire_timeout_ms)
     }
   }
 

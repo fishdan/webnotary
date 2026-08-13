@@ -52,6 +52,18 @@ variable "log_retention_days" {
   default     = 30
 }
 
+variable "acquire_mode" {
+  type        = bool
+  description = "When true, lookup Lambda sync-observes unknown checks within acquire_timeout_ms (bypasses CT gate for that path)"
+  default     = true
+}
+
+variable "acquire_timeout_ms" {
+  type        = number
+  description = "Max milliseconds for sync acquire observe on unknown checks"
+  default     = 5000
+}
+
 locals {
   name_prefix = "${var.project}-${var.environment}-"
 }

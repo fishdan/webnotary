@@ -13,6 +13,8 @@ Stub specifications for WebNotary release 0. Detail via SpecKit workflows before
 | CT gate + trust policy | `0.007-ct-gate-and-trust-policy` | `0.007-ct-gate-and-trust-policy` | 0.005, 0.006 |
 | Chrome extension | `0.008-chrome-extension` | `0.008-chrome-extension` | backend E2E |
 | Public API custom domain | `0.009-api-custom-domain` | `0.009-api-custom-domain` | 0.002–0.003, Route53 zone |
+| Functional testing | `0.010-functional-testing` | `0.010-functional-testing` | observer + public API; top-25 report |
+| Acquire mode toggle | `0.011-acquire-mode` | (with 0.010 branch) | 0.007 gate + observer |
 
 Product source of truth for intent: `/webnotary.md`  
 Engineering law: `/.specify/memory/constitution.md`

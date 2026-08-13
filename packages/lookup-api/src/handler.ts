@@ -11,15 +11,22 @@ import {
   type PublicStatus,
 } from "@webnotary/trust-policy";
 import {
+  acquireTimeoutMs,
+  acquireUnknown,
+  isAcquireModeEnabled,
+} from "./acquire.js";
+import {
   createDynamoClientSightingRecorder,
   createDynamoCtSeenStamper,
   createDynamoDomainCertStore,
   createDynamoInventoryStore,
+  createDynamoObservedCertUpserter,
   createSqsVerificationScheduler,
   type ClientSightingRecorder,
   type CtSeenStamper,
   type DomainCertStore,
   type InventoryStore,
+  type ObservedCertUpserter,
   type VerificationScheduler,
 } from "./dynamo.js";
 
@@ -36,6 +43,10 @@ export interface HandlerDeps {
   sightings?: ClientSightingRecorder;
   scheduler?: VerificationScheduler;
   ctSeen?: CtSeenStamper;
+  acquireMode?: boolean;
+  acquireTimeoutMs?: number;
+  upsertObserved?: ObservedCertUpserter;
+  acquireFn?: typeof acquireUnknown;
 }
 
 function json(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
@@ -138,9 +149,36 @@ export async function handleCheck(
       }
     }
 
+    const acquireMode = deps.acquireMode === true;
+
+    if (status === "unknown" && acquireMode && deps.upsertObserved) {
+      const acquireFn = deps.acquireFn ?? acquireUnknown;
+      try {
+        const acquired = await acquireFn({
+          hostname,
+          clientCertificateSha256: certificateSha256,
+          deps: {
+            upsertObserved: deps.upsertObserved,
+            timeoutMs: deps.acquireTimeoutMs ?? 5000,
+          },
+        });
+        if (acquired.ok) {
+          status = acquired.status;
+        } else {
+          console.warn("acquire did not complete", acquired);
+        }
+      } catch (err) {
+        console.warn("acquire failed", err);
+      }
+    }
+
     if (
       deps.scheduler &&
-      shouldEnqueueVerification({ publicStatus: status, inventoryKnown })
+      shouldEnqueueVerification({
+        publicStatus: status,
+        inventoryKnown,
+        acquireMode,
+      })
     ) {
       try {
         await deps.scheduler.tryEnqueue(hostname, certificateSha256);
@@ -171,11 +209,15 @@ function defaultDeps(): HandlerDeps {
     throw new Error("TABLE_NAME is required");
   }
   const queueUrl = process.env.VERIFY_QUEUE_URL;
+  const acquireMode = isAcquireModeEnabled();
   const deps: HandlerDeps = {
     store: createDynamoDomainCertStore(tableName),
     inventory: createDynamoInventoryStore(tableName),
     sightings: createDynamoClientSightingRecorder(tableName),
     ctSeen: createDynamoCtSeenStamper(tableName),
+    acquireMode,
+    acquireTimeoutMs: acquireTimeoutMs(),
+    upsertObserved: createDynamoObservedCertUpserter(tableName),
   };
   if (queueUrl) {
     deps.scheduler = createSqsVerificationScheduler({ tableName, queueUrl });

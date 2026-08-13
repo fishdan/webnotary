@@ -168,3 +168,27 @@
 - Smoke: `POST https://api.webnotary.org/v1/check` → `{"status":"valid"}` for known observed example.com FP; garbage on fresh host → `unknown`. Legacy execute-api URL still works.
 - Out of scope still: apex/www CloudFront site.
 - Follow-up: PR when requested; then 0.008 extension can target the public hostname.
+
+## 2026-08-13 Update – Start 0.010 functional testing SpecKit
+
+- Summary: Branched `0.010-functional-testing`; initial SpecKit drafted then redirected per human: top-25 observe → check → report.
+- Follow-up: implement runner.
+
+## 2026-08-13 Update – Implement 0.010 top-25 functional report
+
+- Summary: Shipped `@webnotary/functional-tests` — curated top 25 sites, observe live certs via `@webnotary/observer`, POST each to `https://api.webnotary.org/v1/check`, write Markdown+JSON reports under `packages/functional-tests/reports/` (gitignored).
+- Branch: `0.010-functional-testing`
+- Run: `cd packages/functional-tests && npm run functional`
+- Live result (2026-08-13): 25/25 observe+check succeeded; summary `api_unknown: 25` (expected on cold trust/CT gate); 0 observe/api hard errors.
+- Semantics: report distinguishes PKI `observeTlsValid` from WebNotary API status.
+- Follow-up: PR when requested; later runs should show more `valid` as inventory+observers cover popular hosts.
+
+## 2026-08-13 Update – Acquire mode toggle (0.011)
+
+- Summary: Lookup Lambda env `ACQUIRE_MODE=true` (default on in Terraform) sync-observes unknown checks within `ACQUIRE_TIMEOUT_MS` (5000). Bypasses CT gate for that path; persists `SINGLE_OBSERVED` for observed cert; returns `valid`/`conflict`/`unknown`. On timeout, still async-enqueues without CT gate.
+- Branch: `0.010-functional-testing`
+- Files: `packages/lookup-api/src/acquire.ts`, handler wiring, trust-policy `acquireMode` enqueue bypass; `specs/0/0.011-acquire-mode/*`
+- Infra: lookup timeout 15s, memory 512; env vars via `var.acquire_mode` / `var.acquire_timeout_ms`
+- Apply: 0 added, 1 changed, **0 destroyed**
+- Smoke: `cloudflare.com` live FP → `{"status":"valid"}` in ~1.4s; Dynamo `SINGLE_OBSERVED`
+- Toggle off: set `acquire_mode = false` in tfvars / Terraform variable
