@@ -1,1 +1,25 @@
 # Repository Settings
+
+## SpecKit `tasks.md` standard
+
+When generating or updating SpecKit `tasks.md` files, follow the **human-readable standard** established in:
+
+`specs/0/0.005-verification-orchestration/tasks.md`
+
+That file is the exemplar. Future task lists MUST match this quality bar.
+
+### Required shape
+
+1. **Header** — Input links (`spec.md` / `plan.md` / etc.), status, branch, and a short **Goal** paragraph stating what “done” means in plain language.
+2. **Phased sections** — Group tasks by phase (design freeze, implementation slices, infra, validation). Each phase has a one-line **Purpose**.
+3. **Descriptive tasks** — Each checkbox must be understandable alone by a human who did not write the code. Include:
+   - **what** to do
+   - **where** (concrete paths / package names when known)
+   - **important behavior constraints** (e.g. “never elevate client sightings to trust”, “dedupe by hostname”)
+   - **acceptance hints** when useful (tests to run, expected outcomes)
+4. **No sparse stubs** — Reject one-liners like `T002 Lookup scheduler + tests` unless expanded with the above detail.
+5. **Optional closeout table** — A short “Notes for humans reading this later” table for cross-cutting behaviors is encouraged.
+
+### Why
+
+Task lists are project history and onboarding docs, not AI scratchpads. A reviewer or future engineer should understand the work from `tasks.md` without reading chat transcripts.
