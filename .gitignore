@@ -18,10 +18,19 @@ build/
 coverage/
 packages/*/dist/
 packages/*/node_modules/
-.terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
+.terraform/
+*.tfvars
+!*.tfvars.example
+tfplan
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 
 # Env
 .env

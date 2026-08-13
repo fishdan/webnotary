@@ -1,8 +1,20 @@
 # Manual Tester: Serverless AWS Foundation
 
-**Status**: Stub
+**Status**: Data plane applied
 
-1. `terraform plan` clean against empty/dev account.
-2. Apply; confirm DynamoDB, SQS, S3, API GW resources exist.
-3. Confirm no VPC/NAT/EC2 created.
-4. Confirm IAM policies are least-privilege enough for documented roles.
+## Checklist
+
+- [x] DynamoDB `webnotary-dev-table` (`pk`/`sk`, TTL, PITR)
+- [x] SQS verify + DLQ (maxReceiveCount 3)
+- [x] S3 evidence private + versioning + HTTPS deny
+- [x] HTTP API shell + throttle defaults
+- [x] Log groups for future Lambdas
+- [x] No IAM roles (deferred)
+- [x] No SNS / alarms / budgets
+- [x] No VPC/EC2/etc.
+
+```bash
+cd infra
+terraform plan   # expect no pending IAM creates
+terraform output
+```
