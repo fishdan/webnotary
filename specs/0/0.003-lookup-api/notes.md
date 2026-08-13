@@ -3,17 +3,17 @@
 ## Source map
 
 - `webnotary.md` — Public API; Step 3; Initial Development Milestone
-- Constitution — XXII, XXIII, XXV
+- Constitution — XXI, XXII, XXIII, XXV
+- 0.001 — keys + `@webnotary/data-model`
+- 0.002 — HTTP API + DynamoDB table outputs
 
-## Contract sketch
+## Contracts
 
-```json
-POST /v1/check
-{ "hostname": "example.com", "certificateSha256": "ABC123..." }
-→ { "status": "valid" | "unknown" | "conflict" }
-```
+- [check-api.md](./contracts/check-api.md)
+- [status-mapping.md](./contracts/status-mapping.md)
 
-## Dependencies
+## Deployed (dev)
 
-- Requires: 0.001, 0.002
-- Extended by: 0.005, 0.007
+- Check URL: `https://5jdix54pag.execute-api.us-east-1.amazonaws.com/v1/check`
+- Lambda: `webnotary-dev-lookup`
+- Role: `webnotary-dev-lookup-role` (GetItem + logs only)

@@ -23,8 +23,7 @@ packages/*/node_modules/
 .terraform/
 *.tfvars
 !*.tfvars.example
-tfplan
-*.tfplan
+infra/build/
 crash.log
 override.tf
 override.tf.json

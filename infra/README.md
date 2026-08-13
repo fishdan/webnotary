@@ -46,10 +46,13 @@ terraform output
 - Lambda IAM roles/policies (deferred to 0.003 / 0.005)
 - SNS / CloudWatch alarms / AWS Budgets
 
-## Destroy (dev)
+# Lambda lookup (`POST /v1/check`)
 
-Evidence bucket has `force_destroy=true` by default for `dev` so destroy can remove objects/versions.
+Before `terraform apply` when Lambda code changes:
 
 ```bash
-terraform destroy
+cd packages/lookup-api && npm ci && npm test && npm run build
+cd ../../infra && terraform apply
 ```
+
+Outputs include `check_url`.
