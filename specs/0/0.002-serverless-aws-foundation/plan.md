@@ -1,30 +1,26 @@
 # Implementation Plan: Serverless AWS Foundation
 
 **Branch**: `0.002-serverless-aws-foundation` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)  
-**Status**: Stub
+**Status**: Applied (IAM deferred)
 
 ## Summary
 
-Terraform modules/stack for DynamoDB, SQS/DLQ, S3 evidence, API Gateway HTTP API, Lambda roles, CloudWatch.
+Flat `infra/` Terraform module with **local state**, default region `us-east-1`, API throttle 50/100, **no alerts**, and **no IAM roles**. Provisions DynamoDB (0.001), SQS+DLQ, evidence S3, HTTP API shell, and future Lambda log groups.
 
-## Technical Context
+## Locked decisions
 
-**IaC**: Terraform  
-**Cloud**: AWS serverless  
-**Constraints**: No VPC unless later specified
+See [research.md](./research.md).
 
 ## Constitution Check
 
-- [ ] IX version-controlled infra
-- [ ] XV no unnecessary persistent compute
-- [ ] XVI least privilege
+| Gate | Status |
+|------|--------|
+| IX Version-controlled infra | Pass |
+| XV Serverless / no VPC | Pass |
+| XVI Least privilege | Deferred with roles to app specs |
+| XXIII Cost/abuse alarms | Deferred by human for 0.002 |
+| XXIV Evidence in S3 | Pass |
 
-## Open Questions
+## Current deploy status
 
-- AWS account/region for MVP
-- Naming/prefix conventions
-- Whether website (CloudFront+S3) is in this stack or deferred
-
-## Next
-
-Full `/speckit-plan` when starting 0.002 after 0.001.
+Applied in `dev`: table, queues, bucket, HTTP API, log groups. IAM intentionally out of scope for 0.002.

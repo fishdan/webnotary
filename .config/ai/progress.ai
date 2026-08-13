@@ -45,3 +45,23 @@
   - Fingerprints: lowercase hex SHA-256; hostnames: IDNA/punycode lowercased; no IP literals
 - Tests executed: `cd packages/data-model && npm test` → 14/14 passed; `npm run build` succeeded
 - Follow-up work: human review; commit/PR when requested; then 0.002 can provision from `data-model.md`
+
+## 2026-08-13 Update – SpecKit for 0.002 (review gate)
+
+- Summary: Branched `0.002-serverless-aws-foundation` from updated `main`; fleshed SpecKit docs only (no Terraform yet).
+- Files: `specs/0/0.002-serverless-aws-foundation/{spec,plan,infrastructure,research,tasks,notes,manualtester}.md`
+- Proposed scope: DynamoDB (0.001), SQS+DLQ, evidence S3, HTTP API shell, lookup/observer IAM roles, alarms, budget; defer domain/website/VPC/Lambda code.
+- Blocked on human review of research open questions before implementation.
+
+## 2026-08-13 Update – Implement 0.002 serverless foundation
+
+- Summary: Locked decisions (local state, flat `infra/`, us-east-1, throttle 50/100, **no alerts**) and applied Terraform for non-IAM resources.
+- Created: DynamoDB `webnotary-dev-table`, SQS verify+DLQ, evidence S3 bucket, HTTP API, log groups.
+- Blocker: `iam:CreateRole` AccessDenied for deploying user `Albert`; lookup/observer roles not created yet (Terraform code present).
+- Tests: `terraform validate` OK; plan OK; partial apply OK.
+- Follow-up: grant IAM create-role permissions (or use admin creds), `terraform apply`, then PR.
+
+## 2026-08-13 Update – Defer IAM roles from 0.002
+
+- Summary: Removed `infra/iam.tf` and role outputs. Roles postponed to 0.003/0.005 when Lambdas land; keep using constrained Albert credentials for data-plane deploys.
+- SpecKit updated to match. No new IAM user/role required for 0.002 completion.

@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored) if you need overrides.
+# Defaults already match MVP: us-east-1, webnotary-dev-*, throttle 50/100.
+
+aws_region    = "us-east-1"
+project       = "webnotary"
+environment   = "dev"
+
+http_api_throttle_burst_limit = 100
+http_api_throttle_rate_limit  = 50
+
+evidence_force_destroy = true
