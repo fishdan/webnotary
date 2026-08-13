@@ -1,0 +1,36 @@
+# Local secrets — never commit
+.secrets/
+*.pem
+*.key
+*accessKeys*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+coverage/
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+.venv/
+venv/
+*.egg-info/
+
+# Spec Kit machine-local state (also listed under .specify/.gitignore)
+.specify/feature.json

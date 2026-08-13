@@ -1,0 +1,141 @@
+# Token Optimized Component Architecture (TOCA)
+
+This project adopts the principles of Token Optimized Component Architecture (TOCA).
+
+TOCA is an implementation-agnostic architectural philosophy that minimizes the amount of context required for humans and AI agents to safely understand, modify, test, and deploy software components.
+
+The primary goal of TOCA is to minimize the amount of context required to perform engineering tasks. Reduced AI token consumption is a natural consequence of good TOCA design.
+
+---
+
+## TOCA Principles
+
+### 1. Single Responsibility
+
+Components should do one thing well.
+
+### 2. Explicit Contracts
+
+Components should expose clear and trustworthy interfaces.
+
+### 3. Context Minimization
+
+Components should require the minimum amount of context necessary to safely modify them.
+
+### 4. Independent Verification
+
+Components should be independently testable whenever practical.
+
+### 5. AI Parallelization
+
+Multiple AI agents should be able to work independently on separate components whenever possible.
+
+### 6. Token Optimization
+
+Architectural decisions should consider AI token consumption as an engineering cost.
+
+---
+
+## TOCA Architectural Questions
+
+When making architectural decisions, ask:
+
+- How much context is required to implement a change?
+- Can this component be understood without understanding unrelated components?
+- Can an AI agent safely work on this component in isolation?
+- Can multiple AI agents work on separate components in parallel?
+- Are the component boundaries explicit and trustworthy?
+- Can this component be independently tested?
+- Can its purpose and interfaces be communicated concisely?
+
+---
+
+## AI Instructions
+
+When analyzing or modifying this project:
+
+- Always consider TOCA principles.
+- Prefer context isolation over architectural complexity.
+- Minimize coupling between components.
+- Favor explicit interfaces and contracts.
+- Recommend modularization where appropriate.
+- Consider both human cognitive load and AI token consumption.
+
+Do NOT recommend microservices unless they are clearly justified. TOCA is implementation agnostic.
+
+---
+
+## Repository Analysis Instructions
+
+Analyze this repository for TOCA compliance and provide:
+
+### TOCA Compliance Score (1-10)
+
+- Context Isolation
+- Component Coupling
+- Architectural Clarity
+- AI Parallelization Potential
+- Independent Testability
+- Token Optimization
+
+---
+
+### Context Hotspots
+
+Identify areas that require excessive context to understand or modify.
+
+Examples include:
+
+- Tight coupling between components
+- Excessive cross-module dependencies
+- Poorly defined interfaces
+- Components with multiple responsibilities
+- Large architectural blast radii
+- Features that require understanding unrelated systems
+
+---
+
+### Recommendations
+
+For each recommendation provide:
+
+- The problem.
+- Why it increases context requirements.
+- Estimated impact on token consumption.
+- Estimated impact on developer productivity.
+- Suggested improvements.
+
+Suggestions may include:
+
+- Component extraction
+- Improved interfaces
+- Better documentation
+- Modularization
+- Test isolation
+- Repository restructuring
+- Architectural simplification
+
+---
+
+### Deliverables
+
+Produce:
+
+1. A high-level architectural assessment.
+2. A prioritized list of TOCA violations.
+3. Low-effort improvements.
+4. Medium-term architectural improvements.
+5. Long-term TOCA recommendations.
+6. Opportunities for AI agent parallelization.
+
+---
+
+## Future Projects
+
+All future projects should consider TOCA principles during initial architectural design.
+
+When creating new components, prefer designs that minimize context requirements and maximize independent understanding, testing, and modification.
+
+Context is an engineering resource.
+
+Treat it accordingly.

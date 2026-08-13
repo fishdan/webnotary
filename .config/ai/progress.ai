@@ -1,0 +1,31 @@
+# Progress Log
+
+## 2026-08-13 Update – Adopt WebNotary constitution v1.1
+
+- Summary: Replaced FishDev default constitution with WebNotary-specific constitution based on `webnotary.md`.
+- Files changed:
+  - `.specify/memory/constitution.md`
+  - `.config/ai/defaults/constitution.md`
+- Key decisions:
+  - Adapted Section IX from Flyway/RDBMS to DynamoDB + Terraform/IaC.
+  - Added WebNotary principles XXI–XXVI: trust boundary, public trust semantics, abuse/cost controls, evidence architecture, client privacy/local trust, observer integrity.
+  - Strengthened infrastructure minimalism, public-protocol security assumptions, and MVP scope discipline.
+  - Kept detailed API/schema/implementation plan items out of the constitution so they remain in SpecKit specs.
+- Tests executed: none (documentation/constitution only)
+- Follow-up work: create SpecKit specs for the MVP milestone; continue FishDev init if stack/constitution gates still need human confirmation.
+
+## 2026-08-13 Update – Release 0 SpecKit stubs
+
+- Summary: Added eight stub specifications under `specs/0/` with enough intent/scope/deps to flesh out later.
+- Specs:
+  - `0.001-operational-data-model`
+  - `0.002-serverless-aws-foundation`
+  - `0.003-lookup-api`
+  - `0.004-tls-observer`
+  - `0.005-verification-orchestration`
+  - `0.006-ct-inventory-pipeline`
+  - `0.007-ct-gate-and-trust-policy`
+  - `0.008-chrome-extension`
+- Also added root `.gitignore` (excludes `.secrets/`) and `specs/0/README.md` index.
+- Tests executed: none (documentation only)
+- Follow-up work: flesh out and implement `0.001` on branch `0.001-operational-data-model`.
