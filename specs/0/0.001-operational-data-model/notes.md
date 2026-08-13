@@ -2,21 +2,27 @@
 
 ## Source map
 
-- `webnotary.md` — Data Model; Step 1; Abuse and Cost Controls
+- `webnotary.md` — Data Model; Step 1; Abuse controls; Trust states
 - Constitution — IX, XXI, XXIII, XXIV
 
-## Design anchors (draft)
+## Canonical docs
 
-```text
-PK = HOST#example.com
-SK = CERT#<sha256>
+- Schema: [data-model.md](./data-model.md)
+- Research: [research.md](./research.md)
+- Library: `packages/data-model/`
 
-PK = VERIFY#example.com  (pending)
-```
+## Downstream contracts
 
-Inventory conceptual fields: certificateSha256, spkiSha256, issuer, serial, notBefore, notAfter, SANs, ctFirstSeen, ctLastSeen.
+| Consumer | Uses |
+|----------|------|
+| 0.002 | Table keys `pk`/`sk`, TTL `expiresAt` |
+| 0.003 | `hostCertKeys` + DomainCertificateState.status mapping |
+| 0.005 | Pending VERIFY conditional put/delete; optional `lastEvidenceS3Key` |
+| 0.006 | CERT inventory upsert |
+| 0.007 | Status transition writers |
 
-## Dependencies
+## Open for later specs (not blocking 0.001)
 
-- Blocks: 0.002, 0.003, 0.005
-- Informs: 0.006 (inventory population), 0.007 (status progression)
+- Serial number encoding details for inventory (0.006)
+- Exact S3 key template (0.005)
+- Production multi-observer identity fields
