@@ -84,3 +84,11 @@
   - `CONFLICT` → `conflict`
   - bad fingerprint → 400
 - Follow-up: PR when human requests; next feature 0.004 TLS observer (local) or 0.005 verification orchestration.
+
+## 2026-08-13 Update – Implement 0.004 TLS observer (CLI)
+
+- Summary: Built `@webnotary/observer` with SSRF-safe DNS/IP policy, TLS:443+SNI observe, leaf/SPKI fingerprints, and `webnotary-observer` CLI.
+- Branch: `0.004-tls-observer`
+- Tests: 9/9 unit tests; smoke observe `example.com` succeeded (`tlsValid: true`).
+- Milestone check: seeded observed fingerprint into DynamoDB as `SINGLE_OBSERVED`; `/v1/check` returned `valid`.
+- Deferred: Lambda/SQS packaging to 0.005.
