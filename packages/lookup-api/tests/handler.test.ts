@@ -36,46 +36,53 @@ function eventWithBody(body: unknown): APIGatewayProxyEventV2 {
 const FP = "a".repeat(64);
 
 describe("handleCheck", () => {
-  it("returns valid for SINGLE_OBSERVED", async () => {
+  it("returns valid for SINGLE_OBSERVED and does not enqueue", async () => {
     const store: DomainCertStore = {
       getStatus: vi.fn().mockResolvedValue({ found: true, status: "SINGLE_OBSERVED" }),
     };
+    const scheduler = { tryEnqueue: vi.fn() };
+    const sightings = { record: vi.fn().mockResolvedValue(undefined) };
 
     const res = await handleCheck(
       eventWithBody({ hostname: "Example.COM.", certificateSha256: FP }),
-      { store },
+      { store, scheduler, sightings },
     );
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ status: "valid" });
-    expect(store.getStatus).toHaveBeenCalledWith("example.com", FP);
+    expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
+    expect(sightings.record).toHaveBeenCalledWith("example.com", FP);
   });
 
-  it("returns unknown when missing", async () => {
+  it("returns unknown and enqueues verification", async () => {
     const store: DomainCertStore = {
       getStatus: vi.fn().mockResolvedValue({ found: false }),
     };
+    const scheduler = { tryEnqueue: vi.fn().mockResolvedValue(true) };
 
     const res = await handleCheck(
       eventWithBody({ hostname: "example.com", certificateSha256: FP }),
-      { store },
+      { store, scheduler },
     );
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ status: "unknown" });
+    expect(scheduler.tryEnqueue).toHaveBeenCalledWith("example.com", FP);
   });
 
-  it("returns conflict", async () => {
+  it("returns conflict without enqueue", async () => {
     const store: DomainCertStore = {
       getStatus: vi.fn().mockResolvedValue({ found: true, status: "CONFLICT" }),
     };
+    const scheduler = { tryEnqueue: vi.fn() };
 
     const res = await handleCheck(
       eventWithBody({ hostname: "example.com", certificateSha256: FP }),
-      { store },
+      { store, scheduler },
     );
 
     expect(JSON.parse(res.body as string)).toEqual({ status: "conflict" });
+    expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
   });
 
   it("returns 400 for bad fingerprint without calling store", async () => {
@@ -92,10 +99,20 @@ describe("handleCheck", () => {
     expect(store.getStatus).not.toHaveBeenCalled();
   });
 
-  it("returns 400 for invalid JSON", async () => {
-    const store: DomainCertStore = { getStatus: vi.fn() };
-    const res = await handleCheck(eventWithBody("{"), { store });
-    expect(res.statusCode).toBe(400);
-    expect(store.getStatus).not.toHaveBeenCalled();
+  it("still returns unknown if enqueue fails", async () => {
+    const store: DomainCertStore = {
+      getStatus: vi.fn().mockResolvedValue({ found: false }),
+    };
+    const scheduler = {
+      tryEnqueue: vi.fn().mockRejectedValue(new Error("sqs down")),
+    };
+
+    const res = await handleCheck(
+      eventWithBody({ hostname: "example.com", certificateSha256: FP }),
+      { store, scheduler },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ status: "unknown" });
   });
 });

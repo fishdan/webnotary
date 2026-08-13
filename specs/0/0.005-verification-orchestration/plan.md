@@ -1,28 +1,27 @@
 # Implementation Plan: Verification Orchestration
 
-**Branch**: `0.005-verification-orchestration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)  
-**Status**: Stub
+**Branch**: `0.005-verification-orchestration`  
+**Status**: Implementing
 
-## Summary
+## Components
 
-Extend lookup path with pending dedupe + SQS; wire observer Lambda; store summary in DynamoDB and raw evidence in S3; add baseline abuse controls.
+1. **lookup-api** — after mapping to `unknown`, `tryEnqueue` + client sighting update; extend IAM
+2. **verification-worker** — SQS Lambda using `@webnotary/observer`
+3. **infra/observer_lambda.tf** — role, function, event source mapping; env TABLE/BUCKET/QUEUE
 
-## Technical Context
+## Flow
 
-**Components**: Lookup Lambda, SQS, Observer Lambda, DynamoDB, S3  
-**Constraints**: No synchronous probe on API path
+```text
+POST /v1/check
+  → GetItem
+  → mapStatus
+  → record client sighting (best effort)
+  → if unknown: conditional pending + SQS
+  → return status immediately
 
-## Constitution Check
-
-- [ ] XXI client cannot create trust
-- [ ] XXIII dedupe + TTL + limits
-- [ ] XXIV S3 for raw evidence
-
-## Open Questions
-
-- Interim enqueue policy before CT gate exists
-- Exact S3 key layout for MVP observations
-
-## Next
-
-Full `/speckit-plan` when starting 0.005.
+SQS → worker
+  → observe(hostname)
+  → PutObject evidence
+  → Upsert HOST#/CERT#(observed) SINGLE_OBSERVED if tlsValid
+  → Delete VERIFY# pending
+```
