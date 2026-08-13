@@ -29,3 +29,19 @@
 - Also added root `.gitignore` (excludes `.secrets/`) and `specs/0/README.md` index.
 - Tests executed: none (documentation only)
 - Follow-up work: flesh out and implement `0.001` on branch `0.001-operational-data-model`.
+
+## 2026-08-13 Update – Flesh out 0.001 operational data model
+
+- Summary: Specified and implemented the MVP DynamoDB single-table contract plus shared TypeScript key/normalization library.
+- Branch: `0.001-operational-data-model`
+- Files changed:
+  - `specs/0/0.001-operational-data-model/*` (spec, plan, data-model, research, tasks, notes, manualtester)
+  - `packages/data-model/**` (types, normalize, keys, vitest)
+- Decisions:
+  - Single table `webnotary`; keys `HOST#/CERT#`, `CERT#/META`, `VERIFY#/PENDING`
+  - No GSI in MVP
+  - Pending TTL default 900s with `attribute_not_exists(pk)`
+  - Stored status enum richer than public API; client fields separated from observer fields
+  - Fingerprints: lowercase hex SHA-256; hostnames: IDNA/punycode lowercased; no IP literals
+- Tests executed: `cd packages/data-model && npm test` → 14/14 passed; `npm run build` succeeded
+- Follow-up work: human review; commit/PR when requested; then 0.002 can provision from `data-model.md`
