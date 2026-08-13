@@ -65,3 +65,22 @@
 
 - Summary: Removed `infra/iam.tf` and role outputs. Roles postponed to 0.003/0.005 when Lambdas land; keep using constrained Albert credentials for data-plane deploys.
 - SpecKit updated to match. No new IAM user/role required for 0.002 completion.
+
+## 2026-08-13 Update – Start 0.003 SpecKit (review gate)
+
+- Branch: `0.003-lookup-api` from merged main.
+- SpecKit fleshed: read-only `POST /v1/check`, status mapping contract, no SQS/writes.
+- Open question: IAM for Lambda deploy (Albert lacks CreateRole) — options in `research.md`.
+- Implementation not started pending human review.
+
+## 2026-08-13 Update – Implement 0.003 lookup API
+
+- Summary: Albert granted IAM + Lambda full access; implemented and deployed `POST /v1/check`.
+- Package: `packages/lookup-api` (mapStatus, Dynamo GetItem, handler); 9 unit tests passing.
+- Infra: `infra/lookup_lambda.tf` — role `webnotary-dev-lookup-role`, function `webnotary-dev-lookup`, route on existing HTTP API.
+- Smoke tests against `https://5jdix54pag.execute-api.us-east-1.amazonaws.com/v1/check`:
+  - unknown → `{"status":"unknown"}`
+  - seeded `SINGLE_OBSERVED` → `valid`
+  - `CONFLICT` → `conflict`
+  - bad fingerprint → 400
+- Follow-up: PR when human requests; next feature 0.004 TLS observer (local) or 0.005 verification orchestration.
