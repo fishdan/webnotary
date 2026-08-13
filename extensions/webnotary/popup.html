@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WebNotary</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --ink: #10233a;
+      --muted: #5a6b7d;
+      --ok: #1b7f4e;
+      --warn: #c48a00;
+      --bad: #b00020;
+    }
+    body {
+      font: 13px/1.45 system-ui, sans-serif;
+      margin: 0;
+      padding: 12px 14px;
+      min-width: 280px;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    h1 {
+      font-size: 15px;
+      margin: 0 0 8px;
+      letter-spacing: 0.02em;
+    }
+    .status {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 4px 0 10px;
+    }
+    .status.valid { color: var(--ok); }
+    .status.unknown { color: var(--warn); }
+    .status.conflict { color: var(--bad); }
+    .status.error, .status.n\/a { color: var(--muted); }
+    .meta {
+      color: var(--muted);
+      word-break: break-all;
+      font-size: 12px;
+    }
+    .meta div { margin: 4px 0; }
+    button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+      border: 0;
+      border-radius: 6px;
+      background: #154a78;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    a { color: #154a78; }
+  </style>
+</head>
+<body>
+  <h1>WebNotary</h1>
+  <div id="status" class="status">…</div>
+  <div class="meta" id="meta"></div>
+  <button id="recheck" type="button">Recheck</button>
+  <p class="meta" style="margin-top:10px">
+    <a href="options.html" target="_blank">Options</a>
+  </p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

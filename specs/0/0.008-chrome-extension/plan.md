@@ -1,28 +1,49 @@
 # Implementation Plan: Chrome Extension
 
-**Branch**: `0.008-chrome-extension` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)  
-**Status**: Stub
+**Branch**: `0.008-chrome-extension` | **Spec**: [spec.md](./spec.md)
 
-## Summary
+## Layout
 
-MV3 Chrome extension with local trust cache and minimal WebNotary client for `/v1/check`.
+```text
+extensions/webnotary/
+  manifest.json          # MV3, min_chrome_version 144
+  background.js          # service worker
+  popup.html / popup.js
+  options.html / options.js
+  lib/cache.js
+  lib/check.js
+  lib/fingerprint.js
+  icons/
+  README.md
+```
 
-## Technical Context
+## Cert acquisition (locked approach)
 
-**Platform**: Chrome extension (Manifest V3)  
-**API**: `POST /v1/check`  
-**Constraints**: No per-pageload telemetry; cache expiration required
+`chrome.webRequest.onHeadersReceived` with `extraInfoSpec: ["securityInfo"]`, filter `types: ["main_frame"]`, `urls: ["https://*/*"]`.
 
-## Constitution Check
+Leaf fingerprint from `details.securityInfo.certificates[0].fingerprint.sha256`, normalized to 64 lowercase hex.
 
-- [ ] XXII simple client protocol
-- [ ] XXV no background telemetry / finite local trust
+## Cache
 
-## Open Questions
+Key: `trust:${hostname}` → `{ certificateSha256, status, validatedAt, notAfter, expiresAt }`  
+Only cache `valid` for silent reuse. Store last `unknown`/`conflict` for popup display but still recheck on next navigation after short cooldown (e.g. 5 min) to avoid hammering.
 
-- How extension obtains cert fingerprint in modern Chrome APIs
-- UX for UNKNOWN vs CONFLICT
+## UX
 
-## Next
+| Status | Badge | Popup |
+|--------|-------|-------|
+| valid (cached or fresh) | green / blank | “Trusted by WebNotary” |
+| unknown | `?` yellow | “Not yet independently verified” |
+| conflict | `!` red | Strong warning |
+| no HTTPS / no cert | — | Explain |
 
-Full `/speckit-plan` only after backend E2E works.
+## Borrowed from Subscribed Toolbar
+
+- `chrome.storage` settings get/set helpers  
+- Options page save + message to SW  
+- README load-unpacked steps  
+- `chrome.runtime.onInstalled` init  
+
+## Non-goals
+
+Store listing, Firefox primary support.

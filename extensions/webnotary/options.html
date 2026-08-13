@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WebNotary options</title>
+  <style>
+    body { font: 14px/1.45 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: #10233a; }
+    label { display: block; font-weight: 600; margin-top: 1rem; }
+    input[type=text] { width: 100%; padding: 0.5rem; margin-top: 0.35rem; box-sizing: border-box; }
+    button { margin-top: 1.25rem; padding: 0.55rem 1rem; background: #154a78; color: #fff; border: 0; border-radius: 6px; font-weight: 600; }
+    #msg { margin-top: 0.75rem; color: #1b7f4e; }
+  </style>
+</head>
+<body>
+  <h1>WebNotary options</h1>
+  <p>Backend owns trust policy. This extension only asks <code>/v1/check</code> when local cache cannot answer.</p>
+  <label>
+    Check URL
+    <input id="checkUrl" type="text" spellcheck="false" />
+  </label>
+  <button id="save" type="button">Save</button>
+  <div id="msg"></div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
