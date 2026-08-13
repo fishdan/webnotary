@@ -1,6 +1,10 @@
 resource "aws_apigatewayv2_api" "http" {
   name          = "${local.name_prefix}http-api"
   protocol_type = "HTTP"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_apigatewayv2_stage" "default" {

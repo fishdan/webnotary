@@ -42,8 +42,8 @@ variable "verify_max_receive_count" {
 
 variable "evidence_force_destroy" {
   type        = bool
-  description = "Allow terraform destroy to delete non-empty evidence bucket (dev only)"
-  default     = true
+  description = "Allow terraform destroy to delete non-empty evidence bucket (keep false — never delete WebNotary data)"
+  default     = false
 }
 
 variable "log_retention_days" {
