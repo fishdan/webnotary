@@ -41,6 +41,7 @@ data "aws_iam_policy_document" "lookup" {
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
       "dynamodb:DeleteItem",
+      "dynamodb:Query",
     ]
     resources = [aws_dynamodb_table.webnotary.arn]
   }

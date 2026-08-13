@@ -4,16 +4,20 @@ import {
   DeleteCommand,
   GetCommand,
   PutCommand,
+  QueryCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  certInventoryKeys,
   hostCertKeys,
+  normalizeHostname,
   PENDING_CREATE_CONDITION,
   pendingExpiresAt,
   pendingVerifyKeys,
   type DomainCertStatus,
 } from "@webnotary/data-model";
+import type { SiblingCert } from "@webnotary/trust-policy";
 
 export interface DomainCertLookupResult {
   found: boolean;
@@ -22,10 +26,20 @@ export interface DomainCertLookupResult {
 
 export interface DomainCertStore {
   getStatus(hostname: string, certificateSha256: string): Promise<DomainCertLookupResult>;
+  listSiblings(hostname: string): Promise<SiblingCert[]>;
+}
+
+export interface InventoryStore {
+  hasCertificate(certificateSha256: string): Promise<boolean>;
 }
 
 export interface ClientSightingRecorder {
   record(hostname: string, certificateSha256: string): Promise<void>;
+}
+
+export interface CtSeenStamper {
+  /** Best-effort: set CT_SEEN when missing/UNKNOWN; never downgrade trust/conflict. */
+  stamp(hostname: string, certificateSha256: string): Promise<void>;
 }
 
 export interface VerificationScheduler {
@@ -33,14 +47,21 @@ export interface VerificationScheduler {
   tryEnqueue(hostname: string, requestedCertificateSha256: string): Promise<boolean>;
 }
 
+function docClient(
+  client?: DynamoDBDocumentClient,
+): DynamoDBDocumentClient {
+  return client ?? DynamoDBDocumentClient.from(new DynamoDBClient({}));
+}
+
 export function createDynamoDomainCertStore(
   tableName: string,
-  client: DynamoDBDocumentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+  client?: DynamoDBDocumentClient,
 ): DomainCertStore {
+  const dynamo = docClient(client);
   return {
     async getStatus(hostname, certificateSha256) {
       const keys = hostCertKeys(hostname, certificateSha256);
-      const result = await client.send(
+      const result = await dynamo.send(
         new GetCommand({
           TableName: tableName,
           Key: { pk: keys.pk, sk: keys.sk },
@@ -58,18 +79,67 @@ export function createDynamoDomainCertStore(
         status: result.Item.status as DomainCertStatus | undefined,
       };
     },
+
+    async listSiblings(hostname) {
+      const h = normalizeHostname(hostname);
+      const result = await dynamo.send(
+        new QueryCommand({
+          TableName: tableName,
+          KeyConditionExpression: "pk = :pk",
+          ExpressionAttributeValues: {
+            ":pk": `HOST#${h}`,
+          },
+          ProjectionExpression: "certificateSha256, #s",
+          ExpressionAttributeNames: { "#s": "status" },
+        }),
+      );
+
+      const siblings: SiblingCert[] = [];
+      for (const item of result.Items ?? []) {
+        const fp = item.certificateSha256;
+        const status = item.status;
+        if (typeof fp === "string" && typeof status === "string") {
+          siblings.push({
+            certificateSha256: fp,
+            status: status as DomainCertStatus,
+          });
+        }
+      }
+      return siblings;
+    },
+  };
+}
+
+export function createDynamoInventoryStore(
+  tableName: string,
+  client?: DynamoDBDocumentClient,
+): InventoryStore {
+  const dynamo = docClient(client);
+  return {
+    async hasCertificate(certificateSha256) {
+      const keys = certInventoryKeys(certificateSha256);
+      const result = await dynamo.send(
+        new GetCommand({
+          TableName: tableName,
+          Key: { pk: keys.pk, sk: keys.sk },
+          ProjectionExpression: "pk",
+        }),
+      );
+      return Boolean(result.Item);
+    },
   };
 }
 
 export function createDynamoClientSightingRecorder(
   tableName: string,
-  client: DynamoDBDocumentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+  client?: DynamoDBDocumentClient,
 ): ClientSightingRecorder {
+  const dynamo = docClient(client);
   return {
     async record(hostname, certificateSha256) {
       const keys = hostCertKeys(hostname, certificateSha256);
       const now = new Date().toISOString();
-      await client.send(
+      await dynamo.send(
         new UpdateCommand({
           TableName: tableName,
           Key: { pk: keys.pk, sk: keys.sk },
@@ -100,14 +170,62 @@ export function createDynamoClientSightingRecorder(
   };
 }
 
+export function createDynamoCtSeenStamper(
+  tableName: string,
+  client?: DynamoDBDocumentClient,
+): CtSeenStamper {
+  const dynamo = docClient(client);
+  return {
+    async stamp(hostname, certificateSha256) {
+      const keys = hostCertKeys(hostname, certificateSha256);
+      const now = new Date().toISOString();
+      try {
+        await dynamo.send(
+          new UpdateCommand({
+            TableName: tableName,
+            Key: { pk: keys.pk, sk: keys.sk },
+            UpdateExpression: `
+              SET hostname = :hostname,
+                  certificateSha256 = :fp,
+                  entityType = if_not_exists(entityType, :entityType),
+                  #status = :ctSeen,
+                  ctSeen = :true,
+                  updatedAt = :now
+            `,
+            ConditionExpression:
+              "attribute_not_exists(#status) OR #status = :unknown OR #status = :ctSeen",
+            ExpressionAttributeNames: {
+              "#status": "status",
+            },
+            ExpressionAttributeValues: {
+              ":hostname": hostname,
+              ":fp": certificateSha256,
+              ":entityType": "DOMAIN_CERT",
+              ":ctSeen": "CT_SEEN",
+              ":unknown": "UNKNOWN",
+              ":true": true,
+              ":now": now,
+            },
+          }),
+        );
+      } catch (err) {
+        const name = (err as { name?: string }).name;
+        if (name === "ConditionalCheckFailedException") {
+          return;
+        }
+        throw err;
+      }
+    },
+  };
+}
+
 export function createSqsVerificationScheduler(params: {
   tableName: string;
   queueUrl: string;
   dynamo?: DynamoDBDocumentClient;
   sqs?: SQSClient;
 }): VerificationScheduler {
-  const dynamo =
-    params.dynamo ?? DynamoDBDocumentClient.from(new DynamoDBClient({}));
+  const dynamo = docClient(params.dynamo);
   const sqs = params.sqs ?? new SQSClient({});
 
   return {
@@ -154,7 +272,6 @@ export function createSqsVerificationScheduler(params: {
           }),
         );
       } catch (err) {
-        // Allow a later request to retry enqueue after deleting the orphan pending lock.
         await dynamo
           .send(
             new DeleteCommand({

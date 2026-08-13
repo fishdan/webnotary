@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:deps && esbuild src/handler.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/handler.js",
-    "build:deps": "npm run build --prefix ../data-model",
+    "build:deps": "npm run build --prefix ../data-model && npm run build --prefix ../trust-policy",
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "npm run build && cd dist && zip -q handler.zip handler.js"
@@ -14,7 +14,8 @@
     "@aws-sdk/client-dynamodb": "^3.758.0",
     "@aws-sdk/client-sqs": "^3.758.0",
     "@aws-sdk/lib-dynamodb": "^3.758.0",
-    "@webnotary/data-model": "file:../data-model"
+    "@webnotary/data-model": "file:../data-model",
+    "@webnotary/trust-policy": "file:../trust-policy"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.147",
