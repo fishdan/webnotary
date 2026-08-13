@@ -1,17 +1,16 @@
 # Notes: Chrome Extension
 
-## Source map
+## Reference extension
 
-- `webnotary.md` — Intended Extension Behavior; Steps 12–13; Non-Goals
-- Constitution — XXII, XXV
+`/home/dfish/IdeaProjects/Utilities/extensions/subscribed-toolbar`
 
-## Flow sketch
+Reuse: MV3 service worker, storage settings, options page messaging, load-unpacked README style.
 
-```text
-visit → fingerprint → local trust? → allow : POST /v1/check → valid|unknown|conflict
-```
+## API
 
-## Dependencies
+Default: `https://api.webnotary.org/v1/check`  
+Body: `{ "hostname", "certificateSha256" }`
 
-- After: 0.003+; preferably 0.005–0.007
-- Does not block release-0 observer/API milestone
+## Chrome requirement
+
+Minimum **144** for `webRequest` `securityInfo`.

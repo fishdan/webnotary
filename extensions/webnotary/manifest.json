@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "WebNotary",
+  "version": "0.1.0",
+  "minimum_chrome_version": "144",
+  "description": "Check whether the certificate you see for a site is independently known to WebNotary.",
+  "permissions": ["storage", "webRequest", "notifications", "tabs"],
+  "host_permissions": ["https://*/*", "https://api.webnotary.org/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "WebNotary",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

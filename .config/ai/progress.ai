@@ -192,3 +192,16 @@
 - Apply: 0 added, 1 changed, **0 destroyed**
 - Smoke: `cloudflare.com` live FP → `{"status":"valid"}` in ~1.4s; Dynamo `SINGLE_OBSERVED`
 - Toggle off: set `acquire_mode = false` in tfvars / Terraform variable
+
+## 2026-08-13 Update – Start Chrome extension 0.008
+
+- Summary: Branched `0.008-chrome-extension`. SpecKit fleshed; scaffolded MV3 extension under `extensions/webnotary/` using patterns from Subscribed Toolbar and Chrome 144+ `webRequest.securityInfo` for leaf fingerprints.
+- Behavior: main_frame HTTPS → local trust cache → optional `POST https://api.webnotary.org/v1/check`; badge `?` / `!` / calm; conflict notification; options for check URL.
+- Follow-up: load unpacked manual test on Chrome 144+; PR when requested.
+
+## 2026-08-13 Update – Chrome extension 0.008 verified
+
+- Summary: Unpacked extension works after enabling Chrome flag `#web-request-security-info` (**Enable SecurityInfo in WebRequest API**). Without it: `ExtraInfoSpec.securityInfo is allowed only with WebRequestSecurityInfo developer flag`.
+- Manual: `fishdan.com` → popup **VALID**, live fingerprint, `Cache: no_cache`, check via `api.webnotary.org`.
+- Files: `extensions/webnotary/**`, SpecKit `specs/0/0.008-chrome-extension/*`, README flag docs.
+- Out of commit: local `infra/tfplan*` artifacts.
