@@ -101,3 +101,10 @@
 - E2E: unknown client FP for example.com → worker evidence in S3 → `/v1/check` with observed FP returns `valid`.
 - Interim: no CT gate yet (hostname-deduped probes only).
 - Follow-up: PR; then 0.006 CT inventory.
+
+## 2026-08-13 Update – SpecKit tasks.md readability standard
+
+- Summary: Adopted the expanded `0.005` `tasks.md` style as the repository standard for all future SpecKit task generation.
+- Recorded in: `.config/ai/repo.ai` (exemplar path: `specs/0/0.005-verification-orchestration/tasks.md`).
+- Decision: No sparse one-line tasks; phases, goals, file paths, and behavior constraints required.
+- Follow-up work: next feature is likely `0.006-ct-inventory-pipeline`.
