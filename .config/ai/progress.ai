@@ -108,3 +108,32 @@
 - Recorded in: `.config/ai/repo.ai` (exemplar path: `specs/0/0.005-verification-orchestration/tasks.md`).
 - Decision: No sparse one-line tasks; phases, goals, file paths, and behavior constraints required.
 - Follow-up work: next feature is likely `0.006-ct-inventory-pipeline`.
+
+## 2026-08-13 Update – Monthly vulnerability audit
+
+- Summary: Session-startup dependency audit for Node packages.
+- Commands: `npm audit --omit=dev` in `packages/data-model`, `lookup-api`, `observer`, `verification-worker`.
+- Findings: 0 vulnerabilities in all four packages.
+- Fixes: none required.
+- Follow-up: re-audit when new production dependencies are added (e.g. CT ingest package).
+
+## 2026-08-13 Update – Start 0.006 CT inventory SpecKit (review gate)
+
+- Summary: Branched `0.006-ct-inventory-pipeline` from `main` (post-0.005 + tasks.md standard). Fleshed SpecKit only — no ingest code yet.
+- Files: `specs/0/0.006-ct-inventory-pipeline/{spec,plan,research,tasks,notes,manualtester}.md` (tasks follow 0.005 readability standard).
+- Proposed MVP: crt.sh + PEM CLI; inventory-only Dynamo upserts; no DER in S3; no HOST# trust writes; optional EventBridge Lambda; no alarms.
+- Blocked on human lock of research open questions before implementation.
+- Follow-up: lock D1–D7 → implement `packages/ct-ingest` per tasks.md.
+
+## 2026-08-13 Update – Implement 0.006 CT inventory pipeline
+
+- Summary: Locked D1–D7 as proposed; shipped `@webnotary/ct-ingest` + daily EventBridge Lambda. Inventory-only writes (`CERT#`/`META`); no DER in S3; no HOST# trust mutations.
+- Branch: `0.006-ct-inventory-pipeline`
+- Package: `packages/ct-ingest` — normalize, crt.sh client, Dynamo upsert, CLI (`host` / `file`), Lambda handler.
+- Infra: `infra/ct_ingest_lambda.tf` — `webnotary-dev-ct-ingest`, role, `rate(1 day)`, seed `example.com`.
+- Tests: `cd packages/ct-ingest && npm test` → 7/7 passed; `npm run build` OK; `npm audit --omit=dev` → 0 vulns.
+- Manual:
+  - File ingest upserted fixture cert; re-ingest preserved `ctFirstSeen`, advanced `ctLastSeen`.
+  - No `HOST#` row created for the fixture fingerprint.
+  - Live crt.sh returned HTTP 502 during validation; Lambda invoke failed with `all CT seed hostnames failed` (expected when every seed fails).
+- Follow-up: PR when requested; re-try crt.sh host ingest when aggregator recovers; then 0.007 CT gate.
