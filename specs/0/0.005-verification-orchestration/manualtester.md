@@ -1,8 +1,6 @@
-# Manual Tester: Verification Orchestration
+# Manual Tester
 
-**Status**: Stub
-
-1. Unknown check returns immediately; exactly one pending/SQS job appears.
-2. Repeat unknown; no additional probe fan-out.
-3. After observer runs, DynamoDB state and S3 object exist.
-4. Confirm client sighting fields never alone produce VALID.
+1. Pick a hostname without DomainCertificateState (or use fresh FP).
+2. POST /v1/check twice quickly → still unknown; only one SQS/pending.
+3. Wait for worker; confirm S3 object + DynamoDB SINGLE_OBSERVED for **observed** FP.
+4. POST /v1/check with observed FP → valid.

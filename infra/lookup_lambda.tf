@@ -34,12 +34,26 @@ data "aws_iam_policy_document" "lookup" {
   }
 
   statement {
-    sid    = "DynamoDBRead"
+    sid    = "DynamoDBAccess"
     effect = "Allow"
     actions = [
       "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
     ]
     resources = [aws_dynamodb_table.webnotary.arn]
+  }
+
+  statement {
+    sid    = "SendVerificationJobs"
+    effect = "Allow"
+    actions = [
+      "sqs:SendMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+    ]
+    resources = [aws_sqs_queue.verify.arn]
   }
 }
 
@@ -63,7 +77,8 @@ resource "aws_lambda_function" "lookup" {
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.webnotary.name
+      TABLE_NAME       = aws_dynamodb_table.webnotary.name
+      VERIFY_QUEUE_URL = aws_sqs_queue.verify.url
     }
   }
 

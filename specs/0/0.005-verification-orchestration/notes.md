@@ -1,11 +1,3 @@
-# Notes: Verification Orchestration
+# Notes
 
-## Source map
-
-- `webnotary.md` — Unknown Certificate Flow; Steps 5–7; Abuse and Cost Controls
-- Constitution — XXI, XXIII, XXIV, XXV
-
-## Dependencies
-
-- Requires: 0.001–0.004
-- Refined by: 0.006–0.007 (CT gate)
+E2E: POST unknown host → pending+SQS → worker observes → check returns valid for observed FP.
