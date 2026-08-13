@@ -1,5 +1,7 @@
 # WebNotary Release 0 — SpecKit Index
 
+Public-facing project overview: [`/README.md`](../../README.md).
+
 Release 0 is the **minimum end-to-end system**: a public lookup API, independent TLS observation, CT inventory (evidence, not trust), abuse-aware verification, and a Chrome extension that asks whether a hostname/certificate pair is independently known.
 
 > Clients can request investigation. Only observers create trust.

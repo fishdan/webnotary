@@ -205,3 +205,7 @@
 - Manual: `fishdan.com` → popup **VALID**, live fingerprint, `Cache: no_cache`, check via `api.webnotary.org`.
 - Files: `extensions/webnotary/**`, SpecKit `specs/0/0.008-chrome-extension/*`, README flag docs.
 - Out of commit: local `infra/tfplan*` artifacts.
+
+## 2026-08-13 Update – Public root README
+
+- Summary: Added repo-root `README.md` for GitHub visitors (product question, API curl, extension pointer, architecture, layout). Kept `specs/0/README.md` as SpecKit index and linked it from root (and root from specs/0).
