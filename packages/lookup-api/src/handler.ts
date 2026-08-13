@@ -5,14 +5,23 @@ import {
   normalizeHostname,
 } from "@webnotary/data-model";
 import {
+  detectConflictFromSiblings,
+  shouldEnqueueVerification,
+  toPublicStatus,
+  type PublicStatus,
+} from "@webnotary/trust-policy";
+import {
   createDynamoClientSightingRecorder,
+  createDynamoCtSeenStamper,
   createDynamoDomainCertStore,
+  createDynamoInventoryStore,
   createSqsVerificationScheduler,
   type ClientSightingRecorder,
+  type CtSeenStamper,
   type DomainCertStore,
+  type InventoryStore,
   type VerificationScheduler,
 } from "./dynamo.js";
-import { mapStatus, type PublicStatus } from "./mapStatus.js";
 
 const MAX_BODY_BYTES = 4096;
 
@@ -23,8 +32,10 @@ export interface CheckRequest {
 
 export interface HandlerDeps {
   store: DomainCertStore;
+  inventory: InventoryStore;
   sightings?: ClientSightingRecorder;
   scheduler?: VerificationScheduler;
+  ctSeen?: CtSeenStamper;
 }
 
 function json(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
@@ -81,7 +92,25 @@ export async function handleCheck(
     const hostname = normalizeHostname(request.hostname);
     const certificateSha256 = normalizeCertificateSha256(request.certificateSha256);
     const result = await deps.store.getStatus(hostname, certificateSha256);
-    const status: PublicStatus = result.found ? mapStatus(result.status) : mapStatus(undefined);
+    let status: PublicStatus = result.found
+      ? toPublicStatus(result.status)
+      : toPublicStatus(undefined);
+
+    if (status === "unknown") {
+      try {
+        const siblings = await deps.store.listSiblings(hostname);
+        if (
+          detectConflictFromSiblings({
+            clientCertificateSha256: certificateSha256,
+            siblings,
+          })
+        ) {
+          status = "conflict";
+        }
+      } catch (err) {
+        console.warn("sibling conflict scan failed", err);
+      }
+    }
 
     if (deps.sightings) {
       try {
@@ -91,7 +120,28 @@ export async function handleCheck(
       }
     }
 
-    if (status === "unknown" && deps.scheduler) {
+    let inventoryKnown = false;
+    if (status === "unknown") {
+      try {
+        inventoryKnown = await deps.inventory.hasCertificate(certificateSha256);
+      } catch (err) {
+        console.warn("inventory lookup failed", err);
+        inventoryKnown = false;
+      }
+    }
+
+    if (inventoryKnown && deps.ctSeen && status === "unknown") {
+      try {
+        await deps.ctSeen.stamp(hostname, certificateSha256);
+      } catch (err) {
+        console.warn("CT_SEEN stamp failed", err);
+      }
+    }
+
+    if (
+      deps.scheduler &&
+      shouldEnqueueVerification({ publicStatus: status, inventoryKnown })
+    ) {
       try {
         await deps.scheduler.tryEnqueue(hostname, certificateSha256);
       } catch (err) {
@@ -123,7 +173,9 @@ function defaultDeps(): HandlerDeps {
   const queueUrl = process.env.VERIFY_QUEUE_URL;
   const deps: HandlerDeps = {
     store: createDynamoDomainCertStore(tableName),
+    inventory: createDynamoInventoryStore(tableName),
     sightings: createDynamoClientSightingRecorder(tableName),
+    ctSeen: createDynamoCtSeenStamper(tableName),
   };
   if (queueUrl) {
     deps.scheduler = createSqsVerificationScheduler({ tableName, queueUrl });

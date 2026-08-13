@@ -137,3 +137,24 @@
   - No `HOST#` row created for the fixture fingerprint.
   - Live crt.sh returned HTTP 502 during validation; Lambda invoke failed with `all CT seed hostnames failed` (expected when every seed fails).
 - Follow-up: PR when requested; re-try crt.sh host ingest when aggregator recovers; then 0.007 CT gate.
+
+## 2026-08-13 Update – Start 0.007 CT gate SpecKit (review gate)
+
+- Summary: Branched `0.007-ct-gate-and-trust-policy` from main (0.006 merged). Fleshed SpecKit only — no lookup/policy code yet.
+- Files: `specs/0/0.007-ct-gate-and-trust-policy/{spec,plan,research,tasks,notes,manualtester}.md` (0.005 tasks readability standard).
+- Proposed: inventory GetItem gate before enqueue; `packages/trust-policy`; CONFLICT when sibling observed FP ≠ client FP; optional CT_SEEN stamp; no new infra.
+- Blocked on human lock of research open questions before implementation.
+
+## 2026-08-13 Update – Implement 0.007 CT gate and trust policy
+
+- Summary: Locked D1–D6; shipped `@webnotary/trust-policy` and wired lookup `/v1/check` with inventory gate, sibling CONFLICT, and CT_SEEN stamp.
+- Branch: `0.007-ct-gate-and-trust-policy`
+- Package: `packages/trust-policy` — `toPublicStatus`, `shouldEnqueueVerification`, `detectConflictFromSiblings` (dev VALID note in README).
+- Lookup: inventory GetItem before enqueue; Query siblings for CONFLICT; stamp `CT_SEEN` when inventory known; `mapStatus` re-exports policy.
+- Infra: lookup IAM gains `dynamodb:Query`; Lambda code updated (no new resources).
+- Tests: trust-policy 7/7; lookup-api 11/11; builds OK.
+- Manual (live API):
+  - Clean host + garbage FP → `unknown`, no pending.
+  - Inventory FP + clean host → `unknown`, pending + `CT_SEEN`.
+  - `example.com` + non-observed FP → `conflict`; known observed FP → `valid`.
+- Follow-up: PR when requested; then 0.008 Chrome extension.
