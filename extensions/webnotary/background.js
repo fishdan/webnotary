@@ -12,6 +12,7 @@ import { postCheck } from "./lib/check.js";
 import {
   conflictReasonLabel,
   recordConflict,
+  shouldStickyNotify,
 } from "./lib/conflicts.js";
 import {
   describeCheckBlocker,
@@ -75,9 +76,13 @@ async function resolveTabState(tabId, tabUrl) {
         cacheAction: "use_cache",
         cacheReason: "recovered_from_trust",
         conflictReason: trust.conflictReason,
-        conflictExplain: trust.conflictReason
-          ? conflictReasonLabel(trust.conflictReason)
-          : undefined,
+        conflictSeverity: trust.conflictSeverity,
+        conflictExplain:
+          trust.conflictSummary ||
+          (trust.conflictReason
+            ? conflictReasonLabel(trust.conflictReason, trust.conflictSeverity)
+            : undefined),
+        conflictSummary: trust.conflictSummary,
         knownCertificateSha256s: trust.knownCertificateSha256s || [],
         conflictId: trust.conflictId,
         recovered: true,
@@ -112,7 +117,7 @@ async function resolveTabState(tabId, tabUrl) {
   }
 }
 
-function setBadge(tabId, status) {
+function setBadge(tabId, status, severity) {
   if (tabId < 0) return;
   if (status === "valid") {
     chrome.action.setBadgeText({ tabId, text: "" });
@@ -123,12 +128,21 @@ function setBadge(tabId, status) {
     chrome.action.setBadgeBackgroundColor({ tabId, color: "#c48a00" });
     chrome.action.setTitle({ tabId, title: "WebNotary: unknown" });
   } else if (status === "conflict") {
-    chrome.action.setBadgeText({ tabId, text: "!" });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: "#b00020" });
-    chrome.action.setTitle({
-      tabId,
-      title: "WebNotary: CONFLICT — open popup for details",
-    });
+    if (severity === "info") {
+      chrome.action.setBadgeText({ tabId, text: "~" });
+      chrome.action.setBadgeBackgroundColor({ tabId, color: "#6b7280" });
+      chrome.action.setTitle({
+        tabId,
+        title: "WebNotary: multi-cert difference (info) — open popup",
+      });
+    } else {
+      chrome.action.setBadgeText({ tabId, text: "!" });
+      chrome.action.setBadgeBackgroundColor({ tabId, color: "#b00020" });
+      chrome.action.setTitle({
+        tabId,
+        title: "WebNotary: path mismatch — open popup for details",
+      });
+    }
   } else {
     chrome.action.setBadgeText({ tabId, text: "" });
     chrome.action.setTitle({ tabId, title: "WebNotary" });
@@ -141,14 +155,17 @@ function shortFp(fp) {
 }
 
 async function maybeNotifyConflict(record) {
+  if (!shouldStickyNotify(record.severity)) {
+    return;
+  }
   const known = record.knownCertificateSha256s || [];
   const knownLine =
     known.length > 0
-      ? `Known: ${known.map(shortFp).join(", ")}`
+      ? `Public observation: ${known.map(shortFp).join(", ")}`
       : "Open WebNotary for full fingerprints.";
   const message = [
-    conflictReasonLabel(record.reason),
-    `Your browser: ${shortFp(record.certificateSha256)}`,
+    record.summary || conflictReasonLabel(record.reason, record.severity),
+    `Your browser (PKI-accepted): ${shortFp(record.certificateSha256)}`,
     knownLine,
   ].join("\n");
 
@@ -157,7 +174,7 @@ async function maybeNotifyConflict(record) {
     await chrome.notifications.create(notificationId, {
       type: "basic",
       iconUrl: "icons/icon128.png",
-      title: `WebNotary conflict: ${record.hostname}`,
+      title: `WebNotary path mismatch: ${record.hostname}`,
       message,
       contextMessage: "Stays until dismissed — click for details",
       priority: 2,
@@ -178,20 +195,31 @@ async function handleConflictResult({
 }) {
   const knownCertificateSha256s = conflict?.knownCertificateSha256s || [];
   const reason = conflict?.reason;
-  const record = await recordConflict({
+  const severity = conflict?.severity || "attention";
+  const summary = conflict?.summary;
+  const signals = conflict?.signals;
+  const { record, isNew, changed } = await recordConflict({
     hostname,
     certificateSha256,
     knownCertificateSha256s,
     reason,
+    severity,
+    summary,
+    signals,
     checkedAt,
     tabId,
   });
-  await maybeNotifyConflict(record);
+  if (isNew || changed) {
+    await maybeNotifyConflict(record);
+  }
   return {
     conflictReason: reason,
-    conflictExplain: conflictReasonLabel(reason),
+    conflictSeverity: severity,
+    conflictExplain: summary || conflictReasonLabel(reason, severity),
+    conflictSummary: summary,
     knownCertificateSha256s,
     conflictId: record.id,
+    conflictSeenCount: record.seenCount,
   };
 }
 
@@ -201,13 +229,6 @@ async function applyCheckResult(settings, stateBase, result, tabId) {
     result.status === "valid"
       ? computeExpiresAt(settings, validatedAt, undefined)
       : new Date(Date.now() + settings.recheckCooldownMs).toISOString();
-  await putTrust({
-    hostname: stateBase.hostname,
-    certificateSha256: stateBase.certificateSha256,
-    status: result.status,
-    validatedAt,
-    expiresAt,
-  });
 
   let conflictFields = {};
   if (result.status === "conflict") {
@@ -220,6 +241,19 @@ async function applyCheckResult(settings, stateBase, result, tabId) {
     });
   }
 
+  await putTrust({
+    hostname: stateBase.hostname,
+    certificateSha256: stateBase.certificateSha256,
+    status: result.status,
+    validatedAt,
+    expiresAt,
+    conflictReason: conflictFields.conflictReason,
+    conflictSeverity: conflictFields.conflictSeverity,
+    conflictSummary: conflictFields.conflictSummary,
+    knownCertificateSha256s: conflictFields.knownCertificateSha256s,
+    conflictId: conflictFields.conflictId,
+  });
+
   const next = {
     ...stateBase,
     status: result.status,
@@ -227,7 +261,7 @@ async function applyCheckResult(settings, stateBase, result, tabId) {
     ...conflictFields,
   };
   tabState.set(tabId, next);
-  setBadge(tabId, result.status);
+  setBadge(tabId, result.status, conflictFields.conflictSeverity);
   await putTabState(tabId, next);
   return next;
 }
@@ -267,7 +301,11 @@ async function evaluateNavigation(details) {
     if (status === "conflict") {
       conflictFields = {
         conflictReason: cached.conflictReason,
-        conflictExplain: conflictReasonLabel(cached.conflictReason),
+        conflictSeverity: cached.conflictSeverity,
+        conflictExplain:
+          cached.conflictSummary ||
+          conflictReasonLabel(cached.conflictReason, cached.conflictSeverity),
+        conflictSummary: cached.conflictSummary,
         knownCertificateSha256s: cached.knownCertificateSha256s || [],
         conflictId: cached.conflictId,
       };
@@ -299,6 +337,8 @@ async function evaluateNavigation(details) {
         });
         extraTrust = {
           conflictReason: conflictFields.conflictReason,
+          conflictSeverity: conflictFields.conflictSeverity,
+          conflictSummary: conflictFields.conflictSummary,
           knownCertificateSha256s: conflictFields.knownCertificateSha256s,
           conflictId: conflictFields.conflictId,
         };
@@ -328,7 +368,11 @@ async function evaluateNavigation(details) {
     cacheReason: plan.reason,
     ...conflictFields,
   });
-  setBadge(details.tabId, status === "error" ? "unknown" : status);
+  setBadge(
+    details.tabId,
+    status === "error" ? "unknown" : status,
+    conflictFields.conflictSeverity,
+  );
 }
 
 chrome.webRequest.onHeadersReceived.addListener(
@@ -347,7 +391,7 @@ function openConflictDetails(notificationId) {
     ? notificationId.slice(prefix.length)
     : "";
   const url = chrome.runtime.getURL(
-    id ? `conflict.html?id=${encodeURIComponent(id)}` : "conflict.html",
+    id ? `options.html#alert=${encodeURIComponent(id)}` : "options.html",
   );
   chrome.tabs.create({ url });
 }

@@ -57,6 +57,7 @@ Each directory is one SpecKit feature. Open `spec.md` for intent, `plan.md` for 
 | [0.009](./0.009-api-custom-domain/) | `api.webnotary.org` (ACM + APIGW + R53) | `infra/` | 0.002–0.003 | Merged (#9) |
 | [0.010](./0.010-functional-testing/) | Top-25 observe → check → report suite | `packages/functional-tests` | observer + API | Merged (#10) |
 | [0.011](./0.011-acquire-mode/) | Sync-observe unknowns (`ACQUIRE_MODE`) | lookup-api + TF env | 0.007 | Merged (#10) |
+| [0.012](./0.012-path-mismatch-severity/) | Conflict severity: path mismatch vs multi-cert info | trust-policy + lookup + extension | 0.007–0.008 | Active |
 
 ## Suggested reading order
 

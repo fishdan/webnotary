@@ -119,10 +119,17 @@ describe("handleCheck", () => {
       conflict: {
         reason: "sibling_observed",
         knownCertificateSha256s: [FP],
+        severity: "info",
+        signals: {
+          browserPkiAssumed: true,
+          observedLeafCount: 1,
+          clientInCtInventory: true,
+        },
+        summary: expect.stringMatching(/multiple certificates|CT inventory/i),
       },
     });
     expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
-    expect(inv.hasCertificate).not.toHaveBeenCalled();
+    expect(inv.hasCertificate).toHaveBeenCalled();
   });
 
   it("returns stored conflict without enqueue", async () => {
@@ -134,10 +141,11 @@ describe("handleCheck", () => {
       ]),
     };
     const scheduler = { tryEnqueue: vi.fn() };
+    const inv = inventory(false);
 
     const res = await handleCheck(
       eventWithBody({ hostname: "example.com", certificateSha256: FP }),
-      { store, inventory: inventory(true), scheduler },
+      { store, inventory: inv, scheduler },
     );
 
     expect(JSON.parse(res.body as string)).toEqual({
@@ -145,9 +153,37 @@ describe("handleCheck", () => {
       conflict: {
         reason: "stored_conflict",
         knownCertificateSha256s: [FP_B],
+        severity: "attention",
+        signals: {
+          browserPkiAssumed: true,
+          observedLeafCount: 1,
+          clientInCtInventory: false,
+        },
+        summary: expect.stringMatching(/proxy|path|public internet/i),
       },
     });
     expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("marks multi-observed host conflicts as info severity", async () => {
+    const store: DomainCertStore = {
+      getStatus: vi.fn().mockResolvedValue({ found: false }),
+      listSiblings: vi.fn().mockResolvedValue([
+        { certificateSha256: FP, status: "SINGLE_OBSERVED" },
+        { certificateSha256: "c".repeat(64), status: "SINGLE_OBSERVED" },
+      ]),
+    };
+    const inv = inventory(false);
+
+    const res = await handleCheck(
+      eventWithBody({ hostname: "example.com", certificateSha256: FP_B }),
+      { store, inventory: inv, scheduler: { tryEnqueue: vi.fn() } },
+    );
+
+    const body = JSON.parse(res.body as string);
+    expect(body.status).toBe("conflict");
+    expect(body.conflict.severity).toBe("info");
+    expect(body.conflict.signals.observedLeafCount).toBe(2);
   });
 
   it("returns 400 for bad fingerprint without calling store", async () => {

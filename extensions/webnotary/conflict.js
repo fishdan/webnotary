@@ -1,4 +1,8 @@
-import { conflictReasonLabel } from "./lib/conflicts.js";
+import {
+  conflictReasonLabel,
+  getConflict,
+  listConflicts,
+} from "./lib/conflicts.js";
 
 const params = new URLSearchParams(location.search);
 const focusId = params.get("id");
@@ -26,38 +30,47 @@ async function copyText(text) {
 
 function renderDetail(c) {
   if (!c) {
-    lead.textContent = "Conflict not found in local history (it may have been cleared).";
+    lead.textContent =
+      "Conflict not found in local history (it may have been cleared).";
     detail.hidden = true;
     return;
   }
-  lead.textContent = conflictReasonLabel(c.reason);
+  lead.textContent =
+    c.summary || c.reasonLabel || conflictReasonLabel(c.reason, c.severity);
   const known = (c.knownCertificateSha256s || [])
     .map(
       (fp) =>
         `<span class="fp mono">${escapeHtml(fp)} <button type="button" data-copy="${escapeHtml(fp)}">Copy</button></span>`,
     )
-    .join("") || `<span class="muted">No known fingerprints returned by the API yet.</span>`;
+    .join("") ||
+    `<span class="muted">No known fingerprints returned by the API yet.</span>`;
 
   detail.hidden = false;
   detail.innerHTML = `
     <div><strong>Host</strong> ${escapeHtml(c.hostname)}</div>
-    <div style="margin-top:8px"><strong>Your browser leaf</strong></div>
+    <div class="muted" style="margin-top:6px">Severity: <code>${escapeHtml(c.severity || "—")}</code></div>
+    <div style="margin-top:8px"><strong>Certificate your browser sees (PKI-accepted)</strong></div>
     <span class="fp mono">${escapeHtml(c.certificateSha256)}
       <button type="button" data-copy="${escapeHtml(c.certificateSha256)}">Copy</button>
     </span>
-    <div style="margin-top:8px"><strong>Known to WebNotary</strong></div>
+    <div style="margin-top:8px"><strong>Public observation (WebNotary)</strong></div>
     ${known}
     <div class="muted" style="margin-top:10px">
-      Detected ${escapeHtml(c.checkedAt || "—")}
-      ${c.reason ? ` · reason <code>${escapeHtml(c.reason)}</code>` : ""}
+      First ${escapeHtml(c.firstSeenAt || c.checkedAt || "—")}
+      · Last ${escapeHtml(c.lastSeenAt || c.checkedAt || "—")}
+      · Seen ${escapeHtml(String(c.seenCount || 1))}×
+      ${c.reason ? ` · <code>${escapeHtml(c.reason)}</code>` : ""}
     </div>
     <p class="muted" style="margin:10px 0 0">
-      Large CDNs (e.g. Google) often present different leaves by edge/POP.
-      A conflict means WebNotary’s observer evidence does not match <em>this</em> leaf — not that the site failed PKI.
+      This is a path-vs-public-observation signal. Your browser already accepted the leaf under local PKI;
+      WebNotary reports that it differs from independently observed leaf(es) for this hostname.
     </p>
+    <p style="margin:12px 0 0"><a href="options.html">Open Options alert archive</a></p>
   `;
   detail.querySelectorAll("[data-copy]").forEach((btn) => {
-    btn.addEventListener("click", () => copyText(btn.getAttribute("data-copy") || ""));
+    btn.addEventListener("click", () =>
+      copyText(btn.getAttribute("data-copy") || ""),
+    );
   });
 }
 
@@ -65,6 +78,7 @@ function renderList(conflicts) {
   list.innerHTML = "";
   if (!conflicts.length) {
     empty.hidden = false;
+    empty.textContent = "No conflicts in the local archive yet.";
     return;
   }
   empty.hidden = true;
@@ -72,25 +86,26 @@ function renderList(conflicts) {
     const li = document.createElement("li");
     const a = document.createElement("a");
     a.href = `conflict.html?id=${encodeURIComponent(c.id)}`;
-    a.textContent = `${c.hostname} · ${c.checkedAt || ""}`;
+    a.textContent = `${c.hostname} · ${c.severity || "conflict"} · ${c.lastSeenAt || c.checkedAt || ""}`;
     li.appendChild(a);
-    if (c.id === focusId) {
-      li.style.fontWeight = "700";
-    }
+    if (c.id === focusId) li.style.fontWeight = "700";
     list.appendChild(li);
   }
 }
 
-const res = await chrome.runtime.sendMessage({ type: "LIST_CONFLICTS" });
-const conflicts = res?.conflicts || [];
-renderList(conflicts);
-
-if (focusId) {
-  const one = await chrome.runtime.sendMessage({ type: "GET_CONFLICT", id: focusId });
-  renderDetail(one?.conflict || null);
-} else if (conflicts[0]) {
-  renderDetail(conflicts[0]);
-  lead.textContent = conflictReasonLabel(conflicts[0].reason);
-} else {
-  lead.textContent = "No conflict selected.";
+try {
+  lead.textContent = "Loading archive…";
+  const conflicts = await listConflicts();
+  renderList(conflicts);
+  if (focusId) {
+    renderDetail((await getConflict(focusId)) || null);
+  } else if (conflicts[0]) {
+    renderDetail(conflicts[0]);
+  } else {
+    lead.textContent = "No conflict selected.";
+  }
+} catch (err) {
+  lead.textContent = `Failed to load alert archive: ${
+    err instanceof Error ? err.message : String(err)
+  }`;
 }

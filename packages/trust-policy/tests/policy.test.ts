@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyConflictSeverity,
+  conflictSummary,
+  countObservedLeaves,
   detectConflictFromSiblings,
   shouldEnqueueVerification,
   toPublicStatus,
@@ -89,5 +92,55 @@ describe("detectConflictFromSiblings", () => {
         ],
       }),
     ).toBe(false);
+  });
+});
+
+describe("countObservedLeaves", () => {
+  const A = "a".repeat(64);
+  const B = "b".repeat(64);
+
+  it("counts distinct observed leaves only", () => {
+    expect(
+      countObservedLeaves([
+        { certificateSha256: A, status: "SINGLE_OBSERVED" },
+        { certificateSha256: A, status: "SINGLE_OBSERVED" },
+        { certificateSha256: B, status: "ESTABLISHED" },
+        { certificateSha256: "c".repeat(64), status: "UNKNOWN" },
+      ]),
+    ).toBe(2);
+  });
+});
+
+describe("classifyConflictSeverity", () => {
+  it("returns info when client leaf is in CT inventory", () => {
+    expect(
+      classifyConflictSeverity({
+        observedLeafCount: 1,
+        clientInCtInventory: true,
+      }),
+    ).toBe("info");
+  });
+
+  it("returns info when host has multiple observed leaves", () => {
+    expect(
+      classifyConflictSeverity({
+        observedLeafCount: 2,
+        clientInCtInventory: false,
+      }),
+    ).toBe("info");
+  });
+
+  it("returns attention for single observed leaf without CT", () => {
+    expect(
+      classifyConflictSeverity({
+        observedLeafCount: 1,
+        clientInCtInventory: false,
+      }),
+    ).toBe("attention");
+  });
+
+  it("summary text mentions path for attention", () => {
+    expect(conflictSummary("attention")).toMatch(/proxy|path|public internet/i);
+    expect(conflictSummary("info")).toMatch(/multiple certificates/i);
   });
 });

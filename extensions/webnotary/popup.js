@@ -24,17 +24,23 @@ function render(state) {
   const hasCert = Boolean(state.certificateSha256);
   const isConflict = state.status === "conflict";
   const unavailable = state.status === "n/a" || (!hasCert && state.error);
+  const severity = state.conflictSeverity || "";
 
   statusEl.textContent = unavailable
     ? "UNAVAILABLE"
-    : String(state.status || "—").toUpperCase();
+    : isConflict && severity === "info"
+      ? "CONFLICT (INFO)"
+      : isConflict && severity === "attention"
+        ? "PATH MISMATCH"
+        : String(state.status || "—").toUpperCase();
   statusEl.className = `status ${unavailable ? "n/a" : state.status || ""}`;
 
   if (isConflict && hasCert) {
     explainEl.hidden = false;
     explainEl.textContent =
+      state.conflictSummary ||
       state.conflictExplain ||
-      "The certificate your browser sees disagrees with WebNotary evidence.";
+      "Your browser accepted a certificate that differs from WebNotary public observation.";
     detailsBtn.hidden = false;
     detailsBtn.dataset.conflictId = state.conflictId || "";
   } else {
@@ -79,12 +85,13 @@ function render(state) {
     <div><strong>Host</strong> ${escapeHtml(state.hostname || "—")}</div>
     ${
       hasCert
-        ? `<div><strong>Your leaf</strong></div><div class="mono">${escapeHtml(fp)}</div>`
+        ? `<div><strong>Certificate your browser sees (PKI-accepted)</strong></div><div class="mono">${escapeHtml(fp)}</div>`
         : ""
     }
     ${
       isConflict && hasCert
-        ? `<div style="margin-top:6px"><strong>Known to WebNotary</strong></div>${knownHtml}`
+        ? `<div style="margin-top:6px"><strong>Public observation (WebNotary)</strong></div>${knownHtml}
+           ${severity ? `<div><strong>Severity</strong> ${escapeHtml(severity)}</div>` : ""}`
         : ""
     }
     ${state.checkedAt ? `<div><strong>Checked</strong> ${escapeHtml(state.checkedAt)}</div>` : ""}

@@ -86,3 +86,44 @@ export function conflictingObservedFingerprints(input: {
   }
   return out;
 }
+
+/** Count distinct independently observed leaves for a hostname (from sibling rows). */
+export function countObservedLeaves(siblings: SiblingCert[]): number {
+  const seen = new Set<string>();
+  for (const sibling of siblings) {
+    if (!OBSERVED_TRUST_STATUSES.has(sibling.status)) continue;
+    seen.add(sibling.certificateSha256.toLowerCase());
+  }
+  return seen.size;
+}
+
+export type ConflictSeverity = "info" | "attention" | "alert";
+
+/**
+ * Classify a fingerprint conflict for UX — not a change to detection math.
+ *
+ * - info: multi-cert public surface or client leaf known in CT inventory
+ * - attention: single observed public leaf and client leaf not in CT (path mismatch story)
+ * - alert: reserved for stronger multi-observer policy later
+ */
+export function classifyConflictSeverity(input: {
+  observedLeafCount: number;
+  clientInCtInventory: boolean;
+}): ConflictSeverity {
+  if (input.clientInCtInventory) return "info";
+  if (input.observedLeafCount >= 2) return "info";
+  return "attention";
+}
+
+export function conflictSummary(severity: ConflictSeverity): string {
+  switch (severity) {
+    case "info":
+      return "Your browser accepted a certificate that differs from one WebNotary has observed for this host. This host appears to use multiple certificates (or yours is in CT inventory) — often normal for large sites, not proof of attack.";
+    case "attention":
+      return "Your browser accepted a certificate that differs from what WebNotary observes for this host on the public internet. That can indicate a proxy, middlebox, or unexpected path — not that PKI failed in the browser.";
+    case "alert":
+      return "Strong path mismatch: the certificate in your browser does not match independent public observations for this host.";
+    default:
+      return "Certificate fingerprint disagrees with WebNotary public observation.";
+  }
+}

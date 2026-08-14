@@ -49,7 +49,14 @@ Conflict responses **may** include detail (backward compatible; clients may igno
     "reason": "sibling_observed",
     "knownCertificateSha256s": [
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    ]
+    ],
+    "severity": "attention",
+    "signals": {
+      "browserPkiAssumed": true,
+      "observedLeafCount": 1,
+      "clientInCtInventory": false
+    },
+    "summary": "Your browser accepted a certificate that differs from what WebNotary observes for this host on the public internet. That can indicate a proxy, middlebox, or unexpected path — not that PKI failed in the browser."
   }
 }
 ```
@@ -59,6 +66,12 @@ Conflict responses **may** include detail (backward compatible; clients may igno
 | `sibling_observed` | Another observed/trusted leaf exists for this hostname |
 | `stored_conflict` | This pair is already stored as `CONFLICT` |
 | `acquire_mismatch` | Live acquire observer saw a different leaf than the client |
+
+| `conflict.severity` | Meaning |
+|---------------------|---------|
+| `info` | Multi-cert host (`observedLeafCount >= 2`) or client leaf in CT inventory — calm UX |
+| `attention` | Single observed public leaf and client not in CT — path-mismatch story |
+| `alert` | Reserved for stronger multi-observer policy |
 
 ## Error response
 
