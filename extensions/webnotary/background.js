@@ -178,7 +178,7 @@ async function handleConflictResult({
 }) {
   const knownCertificateSha256s = conflict?.knownCertificateSha256s || [];
   const reason = conflict?.reason;
-  const record = await recordConflict({
+  const { record, isNew, changed } = await recordConflict({
     hostname,
     certificateSha256,
     knownCertificateSha256s,
@@ -186,12 +186,16 @@ async function handleConflictResult({
     checkedAt,
     tabId,
   });
-  await maybeNotifyConflict(record);
+  // Notify once per situation; re-notify only if known set / reason changes.
+  if (isNew || changed) {
+    await maybeNotifyConflict(record);
+  }
   return {
     conflictReason: reason,
     conflictExplain: conflictReasonLabel(reason),
     knownCertificateSha256s,
     conflictId: record.id,
+    conflictSeenCount: record.seenCount,
   };
 }
 

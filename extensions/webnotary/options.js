@@ -39,19 +39,26 @@ function renderAlerts(conflicts) {
   for (const c of conflicts.slice(0, MAX_CONFLICTS)) {
     const known = c.knownCertificateSha256s || [];
     const cause = c.reasonLabel || conflictReasonLabel(c.reason);
+    const first = c.firstSeenAt || c.checkedAt;
+    const last = c.lastSeenAt || c.checkedAt;
+    const count = c.seenCount || 1;
+    const when =
+      count > 1
+        ? `First ${shortTime(first)} · Last ${shortTime(last)} · Seen ${count}×`
+        : shortTime(last);
     const article = document.createElement("article");
     article.className = "alert";
     article.dataset.id = c.id || "";
     article.innerHTML = `
       <header>
         <span class="host">${escapeHtml(c.hostname || "—")}</span>
-        <span class="when">${escapeHtml(shortTime(c.checkedAt))}</span>
+        <span class="when">${escapeHtml(when)}</span>
       </header>
       <div class="cause">${escapeHtml(cause)}</div>
       ${c.reason ? `<div class="label">Code: <code>${escapeHtml(c.reason)}</code></div>` : ""}
-      <div class="label" style="margin-top:0.5rem">Your browser leaf</div>
+      <div class="label" style="margin-top:0.5rem">Certificate your browser sees now</div>
       <span class="fp mono">${escapeHtml(c.certificateSha256 || "—")}</span>
-      <div class="label" style="margin-top:0.5rem">Known to WebNotary</div>
+      <div class="label" style="margin-top:0.5rem">Certificate(s) WebNotary has observed for this host</div>
       ${
         known.length
           ? known

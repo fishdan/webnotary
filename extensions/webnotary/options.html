@@ -89,10 +89,12 @@
   <button id="save" type="button">Save</button>
   <div id="msg"></div>
 
-  <h2>Alert archive (last 25 conflicts)</h2>
+  <h2>Alert archive (last 25 situations)</h2>
   <p class="muted">
-    Each conflict notification is stored with its cause and fingerprints.
-    Alerts persist across browser restarts until you clear them.
+    Each distinct conflict (same host + browser leaf + known leaves) is stored once.
+    Revisiting the same situation updates last-seen / count and does not re-notify.
+    This is independent evidence mismatch — not “the browser stored the wrong cert,”
+    and not proof that either leaf fails PKI.
   </p>
   <div class="actions">
     <button id="download" class="secondary" type="button">Download archive (.txt)</button>
