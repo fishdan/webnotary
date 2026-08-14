@@ -131,7 +131,30 @@ export async function recordConflict(entry) {
 export async function listConflicts() {
   const bag = await chrome.storage.local.get(CONFLICT_LOG_KEY);
   const all = Array.isArray(bag[CONFLICT_LOG_KEY]) ? bag[CONFLICT_LOG_KEY] : [];
-  return all.slice(0, MAX_CONFLICTS);
+  return all.slice(0, MAX_CONFLICTS).map(normalizeConflictRecord);
+}
+
+/** Fill fields missing from pre-0.012 archive rows. */
+export function normalizeConflictRecord(c) {
+  if (!c || typeof c !== "object") return c;
+  const severity =
+    c.severity === "info" || c.severity === "attention" || c.severity === "alert"
+      ? c.severity
+      : "attention";
+  const summary =
+    c.summary ||
+    (severity === "info"
+      ? "Your browser accepted a certificate that differs from one WebNotary has observed for this host. This host may use multiple certificates — often normal for large sites."
+      : "Your browser accepted a certificate that differs from what WebNotary observes for this host on the public internet. That can indicate a proxy, middlebox, or unexpected path — not that PKI failed in the browser.");
+  return {
+    ...c,
+    severity,
+    summary,
+    reasonLabel: conflictReasonLabel(c.reason, severity),
+    firstSeenAt: c.firstSeenAt || c.checkedAt,
+    lastSeenAt: c.lastSeenAt || c.checkedAt,
+    seenCount: c.seenCount || 1,
+  };
 }
 
 export async function getConflict(id) {
