@@ -114,7 +114,13 @@ describe("handleCheck", () => {
       { store, inventory: inv, scheduler },
     );
 
-    expect(JSON.parse(res.body as string)).toEqual({ status: "conflict" });
+    expect(JSON.parse(res.body as string)).toEqual({
+      status: "conflict",
+      conflict: {
+        reason: "sibling_observed",
+        knownCertificateSha256s: [FP],
+      },
+    });
     expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
     expect(inv.hasCertificate).not.toHaveBeenCalled();
   });
@@ -122,7 +128,10 @@ describe("handleCheck", () => {
   it("returns stored conflict without enqueue", async () => {
     const store: DomainCertStore = {
       getStatus: vi.fn().mockResolvedValue({ found: true, status: "CONFLICT" }),
-      listSiblings: vi.fn(),
+      listSiblings: vi.fn().mockResolvedValue([
+        { certificateSha256: FP_B, status: "SINGLE_OBSERVED" },
+        { certificateSha256: FP, status: "CONFLICT" },
+      ]),
     };
     const scheduler = { tryEnqueue: vi.fn() };
 
@@ -131,7 +140,13 @@ describe("handleCheck", () => {
       { store, inventory: inventory(true), scheduler },
     );
 
-    expect(JSON.parse(res.body as string)).toEqual({ status: "conflict" });
+    expect(JSON.parse(res.body as string)).toEqual({
+      status: "conflict",
+      conflict: {
+        reason: "stored_conflict",
+        knownCertificateSha256s: [FP_B],
+      },
+    });
     expect(scheduler.tryEnqueue).not.toHaveBeenCalled();
   });
 

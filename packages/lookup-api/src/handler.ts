@@ -5,10 +5,12 @@ import {
   normalizeHostname,
 } from "@webnotary/data-model";
 import {
+  conflictingObservedFingerprints,
   detectConflictFromSiblings,
   shouldEnqueueVerification,
   toPublicStatus,
   type PublicStatus,
+  type SiblingCert,
 } from "@webnotary/trust-policy";
 import {
   acquireTimeoutMs,
@@ -29,6 +31,7 @@ import {
   type ObservedCertUpserter,
   type VerificationScheduler,
 } from "./dynamo.js";
+import type { CheckSuccessBody, ConflictDetail } from "./response.js";
 
 const MAX_BODY_BYTES = 4096;
 
@@ -106,20 +109,52 @@ export async function handleCheck(
     let status: PublicStatus = result.found
       ? toPublicStatus(result.status)
       : toPublicStatus(undefined);
+    let conflict: ConflictDetail | undefined;
+    let siblings: SiblingCert[] | undefined;
+
+    async function loadSiblings(): Promise<SiblingCert[]> {
+      if (siblings) return siblings;
+      siblings = await deps.store.listSiblings(hostname);
+      return siblings;
+    }
 
     if (status === "unknown") {
       try {
-        const siblings = await deps.store.listSiblings(hostname);
+        const list = await loadSiblings();
+        const known = conflictingObservedFingerprints({
+          clientCertificateSha256: certificateSha256,
+          siblings: list,
+        });
         if (
           detectConflictFromSiblings({
             clientCertificateSha256: certificateSha256,
-            siblings,
+            siblings: list,
           })
         ) {
           status = "conflict";
+          conflict = {
+            reason: "sibling_observed",
+            knownCertificateSha256s: known,
+          };
         }
       } catch (err) {
         console.warn("sibling conflict scan failed", err);
+      }
+    }
+
+    if (status === "conflict" && !conflict) {
+      try {
+        const list = await loadSiblings();
+        conflict = {
+          reason: "stored_conflict",
+          knownCertificateSha256s: conflictingObservedFingerprints({
+            clientCertificateSha256: certificateSha256,
+            siblings: list,
+          }),
+        };
+      } catch (err) {
+        console.warn("conflict detail sibling load failed", err);
+        conflict = { reason: "stored_conflict", knownCertificateSha256s: [] };
       }
     }
 
@@ -164,6 +199,12 @@ export async function handleCheck(
         });
         if (acquired.ok) {
           status = acquired.status;
+          if (acquired.status === "conflict") {
+            conflict = {
+              reason: "acquire_mismatch",
+              knownCertificateSha256s: [acquired.observation.certificateSha256],
+            };
+          }
         } else {
           console.warn("acquire did not complete", acquired);
         }
@@ -187,7 +228,17 @@ export async function handleCheck(
       }
     }
 
-    return json(200, { status });
+    const body: CheckSuccessBody =
+      status === "conflict"
+        ? {
+            status,
+            conflict: conflict ?? {
+              reason: "stored_conflict",
+              knownCertificateSha256s: [],
+            },
+          }
+        : { status };
+    return json(200, body);
   } catch (err) {
     if (err instanceof RequestError || err instanceof NormalizationError) {
       return json(400, {

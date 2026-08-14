@@ -40,6 +40,26 @@ Content-Type: application/json
 { "status": "conflict" }
 ```
 
+Conflict responses **may** include detail (backward compatible; clients may ignore):
+
+```json
+{
+  "status": "conflict",
+  "conflict": {
+    "reason": "sibling_observed",
+    "knownCertificateSha256s": [
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    ]
+  }
+}
+```
+
+| `conflict.reason` | Meaning |
+|-------------------|---------|
+| `sibling_observed` | Another observed/trusted leaf exists for this hostname |
+| `stored_conflict` | This pair is already stored as `CONFLICT` |
+| `acquire_mismatch` | Live acquire observer saw a different leaf than the client |
+
 ## Error response
 
 ```http

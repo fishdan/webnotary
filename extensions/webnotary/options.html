@@ -4,22 +4,103 @@
   <meta charset="utf-8" />
   <title>WebNotary options</title>
   <style>
-    body { font: 14px/1.45 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: #10233a; }
-    label { display: block; font-weight: 600; margin-top: 1rem; }
-    input[type=text] { width: 100%; padding: 0.5rem; margin-top: 0.35rem; box-sizing: border-box; }
-    button { margin-top: 1.25rem; padding: 0.55rem 1rem; background: #154a78; color: #fff; border: 0; border-radius: 6px; font-weight: 600; }
-    #msg { margin-top: 0.75rem; color: #1b7f4e; }
+    :root {
+      --ink: #10233a;
+      --muted: #5a6b7d;
+      --bad: #b00020;
+      --line: #d7dee8;
+    }
+    body {
+      font: 14px/1.45 system-ui, sans-serif;
+      max-width: 44rem;
+      margin: 2rem auto;
+      padding: 0 1rem 3rem;
+      color: var(--ink);
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; }
+    p, .muted { color: var(--muted); }
+    label { display: block; font-weight: 600; margin-top: 1rem; color: var(--ink); }
+    input[type=text] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.35rem;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 1rem;
+      margin-right: 0.5rem;
+      padding: 0.55rem 1rem;
+      background: #154a78;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #fff;
+      color: #154a78;
+      border: 1px solid #154a78;
+    }
+    button.danger {
+      background: #fff;
+      color: var(--bad);
+      border: 1px solid var(--bad);
+    }
+    #msg { margin-top: 0.75rem; color: #1b7f4e; min-height: 1.2em; }
+    .alert {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin: 0.65rem 0;
+      background: #fff;
+    }
+    .alert header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: baseline;
+      margin-bottom: 0.35rem;
+    }
+    .alert .host { font-weight: 700; color: var(--bad); }
+    .alert .when { font-size: 12px; color: var(--muted); }
+    .cause { margin: 0.35rem 0 0.5rem; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      word-break: break-all;
+    }
+    .fp { display: block; margin: 0.2rem 0; }
+    .label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    #empty { display: none; }
+    #empty.show { display: block; }
+    .actions { margin-top: 0.75rem; }
   </style>
 </head>
 <body>
   <h1>WebNotary options</h1>
   <p>Backend owns trust policy. This extension only asks <code>/v1/check</code> when local cache cannot answer.</p>
+
   <label>
     Check URL
     <input id="checkUrl" type="text" spellcheck="false" />
   </label>
   <button id="save" type="button">Save</button>
   <div id="msg"></div>
+
+  <h2>Alert archive (last 25 conflicts)</h2>
+  <p class="muted">
+    Each conflict notification is stored with its cause and fingerprints.
+    Alerts persist across browser restarts until you clear them.
+  </p>
+  <div class="actions">
+    <button id="download" class="secondary" type="button">Download archive (.txt)</button>
+    <button id="clear" class="danger" type="button">Clear archive</button>
+  </div>
+  <p id="empty" class="muted">No conflict alerts recorded yet. When a conflict fires, it will appear here.</p>
+  <div id="alerts"></div>
+
   <script type="module" src="options.js"></script>
 </body>
 </html>

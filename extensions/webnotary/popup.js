@@ -1,28 +1,105 @@
 const statusEl = document.getElementById("status");
 const metaEl = document.getElementById("meta");
+const explainEl = document.getElementById("explain");
+const hintEl = document.getElementById("hint");
 const recheckBtn = document.getElementById("recheck");
+const reloadBtn = document.getElementById("reload");
+const detailsBtn = document.getElementById("details");
 
 function render(state) {
   if (!state) {
     statusEl.textContent = "No data yet";
     statusEl.className = "status";
-    metaEl.textContent = "Navigate to an https page, then open this popup.";
+    explainEl.hidden = true;
+    hintEl.hidden = false;
+    hintEl.textContent =
+      "Open an https site and reload the tab after installing or reloading WebNotary.";
+    detailsBtn.hidden = true;
+    reloadBtn.hidden = false;
+    metaEl.textContent = "";
     recheckBtn.disabled = true;
     return;
   }
-  statusEl.textContent = String(state.status || "—").toUpperCase();
-  statusEl.className = `status ${state.status || ""}`;
-  const fp = state.certificateSha256
-    ? `${state.certificateSha256.slice(0, 16)}…`
-    : "—";
+
+  const hasCert = Boolean(state.certificateSha256);
+  const isConflict = state.status === "conflict";
+  const unavailable = state.status === "n/a" || (!hasCert && state.error);
+
+  statusEl.textContent = unavailable
+    ? "UNAVAILABLE"
+    : String(state.status || "—").toUpperCase();
+  statusEl.className = `status ${unavailable ? "n/a" : state.status || ""}`;
+
+  if (isConflict && hasCert) {
+    explainEl.hidden = false;
+    explainEl.textContent =
+      state.conflictExplain ||
+      "The certificate your browser sees disagrees with WebNotary evidence.";
+    detailsBtn.hidden = false;
+    detailsBtn.dataset.conflictId = state.conflictId || "";
+  } else {
+    explainEl.hidden = true;
+    detailsBtn.hidden = true;
+  }
+
+  if (state.restricted) {
+    hintEl.hidden = false;
+    hintEl.textContent = state.error;
+    reloadBtn.hidden = true;
+  } else if (state.needsReload || (!hasCert && state.error)) {
+    hintEl.hidden = false;
+    hintEl.textContent =
+      state.error ||
+      "Reload this page so WebNotary can capture the leaf certificate, then reopen the popup.";
+    reloadBtn.hidden = false;
+  } else if (state.recovered) {
+    hintEl.hidden = false;
+    hintEl.textContent =
+      "Restored last known fingerprint from local cache (service worker had restarted). Recheck is available.";
+    reloadBtn.hidden = true;
+  } else {
+    hintEl.hidden = true;
+    reloadBtn.hidden = true;
+  }
+
+  const fp = state.certificateSha256 || "—";
+  const known = Array.isArray(state.knownCertificateSha256s)
+    ? state.knownCertificateSha256s
+    : [];
+  const knownHtml =
+    known.length > 0
+      ? known
+          .map((k) => `<div class="mono">${escapeHtml(k)}</div>`)
+          .join("")
+      : isConflict && hasCert
+        ? `<div>(no known fingerprints in this response)</div>`
+        : "";
+
   metaEl.innerHTML = `
     <div><strong>Host</strong> ${escapeHtml(state.hostname || "—")}</div>
-    <div><strong>Fingerprint</strong> ${escapeHtml(fp)}</div>
-    <div><strong>Checked</strong> ${escapeHtml(state.checkedAt || "—")}</div>
-    <div><strong>Cache</strong> ${escapeHtml(state.cacheReason || state.cacheAction || "—")}</div>
-    ${state.error ? `<div><strong>Error</strong> ${escapeHtml(state.error)}</div>` : ""}
+    ${
+      hasCert
+        ? `<div><strong>Your leaf</strong></div><div class="mono">${escapeHtml(fp)}</div>`
+        : ""
+    }
+    ${
+      isConflict && hasCert
+        ? `<div style="margin-top:6px"><strong>Known to WebNotary</strong></div>${knownHtml}`
+        : ""
+    }
+    ${state.checkedAt ? `<div><strong>Checked</strong> ${escapeHtml(state.checkedAt)}</div>` : ""}
+    ${
+      state.cacheReason
+        ? `<div><strong>Cache</strong> ${escapeHtml(state.cacheReason)}</div>`
+        : ""
+    }
+    ${
+      state.error && !state.restricted && hasCert
+        ? `<div><strong>Error</strong> ${escapeHtml(state.error)}</div>`
+        : ""
+    }
   `;
-  recheckBtn.disabled = !state.certificateSha256;
+  recheckBtn.disabled = !hasCert;
 }
 
 function escapeHtml(s) {
@@ -33,33 +110,58 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-async function activeTabId() {
+async function activeTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab?.id;
+  return tab;
 }
 
 async function refresh() {
-  const tabId = await activeTabId();
-  if (tabId == null) {
+  const tab = await activeTab();
+  if (tab?.id == null) {
     render(null);
     return;
   }
-  const res = await chrome.runtime.sendMessage({ type: "GET_TAB_STATE", tabId });
+  const res = await chrome.runtime.sendMessage({
+    type: "GET_TAB_STATE",
+    tabId: tab.id,
+    tabUrl: tab.url,
+  });
   render(res?.state || null);
 }
 
 recheckBtn.addEventListener("click", async () => {
   recheckBtn.disabled = true;
-  const tabId = await activeTabId();
-  const res = await chrome.runtime.sendMessage({ type: "RECHECK_TAB", tabId });
+  const tab = await activeTab();
+  const res = await chrome.runtime.sendMessage({
+    type: "RECHECK_TAB",
+    tabId: tab?.id,
+    tabUrl: tab?.url,
+  });
   if (!res?.ok) {
     statusEl.textContent = "ERROR";
     statusEl.className = "status error";
-    metaEl.textContent = res?.error || "recheck failed";
+    explainEl.hidden = true;
+    hintEl.hidden = false;
+    hintEl.textContent = res?.error || "recheck failed";
   } else {
     render(res.state);
   }
   recheckBtn.disabled = false;
+});
+
+reloadBtn.addEventListener("click", async () => {
+  const tab = await activeTab();
+  if (tab?.id == null) return;
+  await chrome.tabs.reload(tab.id);
+  window.close();
+});
+
+detailsBtn.addEventListener("click", () => {
+  const id = detailsBtn.dataset.conflictId;
+  const url = chrome.runtime.getURL(
+    id ? `conflict.html?id=${encodeURIComponent(id)}` : "conflict.html",
+  );
+  chrome.tabs.create({ url });
 });
 
 refresh();
