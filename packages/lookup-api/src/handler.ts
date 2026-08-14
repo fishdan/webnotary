@@ -5,7 +5,10 @@ import {
   normalizeHostname,
 } from "@webnotary/data-model";
 import {
+  classifyConflictSeverity,
+  conflictSummary,
   conflictingObservedFingerprints,
+  countObservedLeaves,
   detectConflictFromSiblings,
   shouldEnqueueVerification,
   toPublicStatus,
@@ -34,6 +37,30 @@ import {
 import type { CheckSuccessBody, ConflictDetail } from "./response.js";
 
 const MAX_BODY_BYTES = 4096;
+
+function buildConflictDetail(input: {
+  reason: ConflictDetail["reason"];
+  knownCertificateSha256s: string[];
+  siblings: SiblingCert[];
+  clientInCtInventory: boolean;
+}): ConflictDetail {
+  const observedLeafCount = countObservedLeaves(input.siblings);
+  const severity = classifyConflictSeverity({
+    observedLeafCount,
+    clientInCtInventory: input.clientInCtInventory,
+  });
+  return {
+    reason: input.reason,
+    knownCertificateSha256s: input.knownCertificateSha256s,
+    severity,
+    signals: {
+      browserPkiAssumed: true,
+      observedLeafCount,
+      clientInCtInventory: input.clientInCtInventory,
+    },
+    summary: conflictSummary(severity),
+  };
+}
 
 export interface CheckRequest {
   hostname: string;
@@ -111,11 +138,22 @@ export async function handleCheck(
       : toPublicStatus(undefined);
     let conflict: ConflictDetail | undefined;
     let siblings: SiblingCert[] | undefined;
+    let inventoryKnown = false;
 
     async function loadSiblings(): Promise<SiblingCert[]> {
       if (siblings) return siblings;
       siblings = await deps.store.listSiblings(hostname);
       return siblings;
+    }
+
+    async function ensureInventoryKnown(): Promise<boolean> {
+      try {
+        inventoryKnown = await deps.inventory.hasCertificate(certificateSha256);
+      } catch (err) {
+        console.warn("inventory lookup failed", err);
+        inventoryKnown = false;
+      }
+      return inventoryKnown;
     }
 
     if (status === "unknown") {
@@ -132,10 +170,13 @@ export async function handleCheck(
           })
         ) {
           status = "conflict";
-          conflict = {
+          await ensureInventoryKnown();
+          conflict = buildConflictDetail({
             reason: "sibling_observed",
             knownCertificateSha256s: known,
-          };
+            siblings: list,
+            clientInCtInventory: inventoryKnown,
+          });
         }
       } catch (err) {
         console.warn("sibling conflict scan failed", err);
@@ -145,16 +186,24 @@ export async function handleCheck(
     if (status === "conflict" && !conflict) {
       try {
         const list = await loadSiblings();
-        conflict = {
+        await ensureInventoryKnown();
+        conflict = buildConflictDetail({
           reason: "stored_conflict",
           knownCertificateSha256s: conflictingObservedFingerprints({
             clientCertificateSha256: certificateSha256,
             siblings: list,
           }),
-        };
+          siblings: list,
+          clientInCtInventory: inventoryKnown,
+        });
       } catch (err) {
         console.warn("conflict detail sibling load failed", err);
-        conflict = { reason: "stored_conflict", knownCertificateSha256s: [] };
+        conflict = buildConflictDetail({
+          reason: "stored_conflict",
+          knownCertificateSha256s: [],
+          siblings: [],
+          clientInCtInventory: false,
+        });
       }
     }
 
@@ -166,14 +215,8 @@ export async function handleCheck(
       }
     }
 
-    let inventoryKnown = false;
     if (status === "unknown") {
-      try {
-        inventoryKnown = await deps.inventory.hasCertificate(certificateSha256);
-      } catch (err) {
-        console.warn("inventory lookup failed", err);
-        inventoryKnown = false;
-      }
+      await ensureInventoryKnown();
     }
 
     if (inventoryKnown && deps.ctSeen && status === "unknown") {
@@ -200,10 +243,21 @@ export async function handleCheck(
         if (acquired.ok) {
           status = acquired.status;
           if (acquired.status === "conflict") {
-            conflict = {
+            const list = await loadSiblings().catch(() => [] as SiblingCert[]);
+            await ensureInventoryKnown();
+            conflict = buildConflictDetail({
               reason: "acquire_mismatch",
               knownCertificateSha256s: [acquired.observation.certificateSha256],
-            };
+              siblings: list.length
+                ? list
+                : [
+                    {
+                      certificateSha256: acquired.observation.certificateSha256,
+                      status: "SINGLE_OBSERVED",
+                    },
+                  ],
+              clientInCtInventory: inventoryKnown,
+            });
           }
         } else {
           console.warn("acquire did not complete", acquired);
@@ -232,10 +286,14 @@ export async function handleCheck(
       status === "conflict"
         ? {
             status,
-            conflict: conflict ?? {
-              reason: "stored_conflict",
-              knownCertificateSha256s: [],
-            },
+            conflict:
+              conflict ??
+              buildConflictDetail({
+                reason: "stored_conflict",
+                knownCertificateSha256s: [],
+                siblings: [],
+                clientInCtInventory: false,
+              }),
           }
         : { status };
     return json(200, body);

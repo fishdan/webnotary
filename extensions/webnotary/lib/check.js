@@ -3,11 +3,6 @@
  * @param {string} hostname
  * @param {string} certificateSha256
  * @param {number} [timeoutMs]
- * @returns {Promise<{
- *   status: 'valid'|'unknown'|'conflict',
- *   conflict?: { reason?: string, knownCertificateSha256s?: string[] },
- *   raw: unknown
- * }>}
  */
 export async function postCheck(checkUrl, hostname, certificateSha256, timeoutMs = 15000) {
   const controller = new AbortController();
@@ -47,6 +42,20 @@ export async function postCheck(checkUrl, hostname, certificateSha256, timeoutMs
                   (x) => typeof x === "string",
                 )
               : [],
+            severity:
+              body.conflict.severity === "info" ||
+              body.conflict.severity === "attention" ||
+              body.conflict.severity === "alert"
+                ? body.conflict.severity
+                : "attention",
+            summary:
+              typeof body.conflict.summary === "string"
+                ? body.conflict.summary
+                : undefined,
+            signals:
+              body.conflict.signals && typeof body.conflict.signals === "object"
+                ? body.conflict.signals
+                : undefined,
           }
         : undefined;
     return { status, conflict, raw: body };

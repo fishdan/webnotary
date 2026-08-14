@@ -212,3 +212,12 @@
 - API: `/v1/check` conflict responses may include `conflict.reason` + `knownCertificateSha256s` (sibling / stored / acquire).
 - Extension: sticky `requireInteraction` notifications, conflict log page, richer popup with full leaf + known FPs.
 - Branch: `fix/conflict-detail-ux`
+
+## 2026-08-14 Update – Path-mismatch conflict severity (0.012)
+
+- Summary: Classify conflicts as path-vs-public-observation with `severity` info|attention|alert (MVP: info + attention).
+- Heuristic: `observedLeafCount >= 2` OR client FP in CT inventory → `info`; else `attention`.
+- API returns `severity`, `signals`, `summary`; extension soft badge `~` + no sticky notify for `info`; sticky path-mismatch notify for `attention`.
+- Archive upserts by situation signature (dedupe). Lookup Lambda updated via Albert `update-function-code`.
+- SpecKit: `specs/0/0.012-path-mismatch-severity/`
+- Branch: `0.012-path-mismatch-severity`
