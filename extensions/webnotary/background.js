@@ -346,8 +346,9 @@ function openConflictDetails(notificationId) {
   const id = notificationId.startsWith(prefix)
     ? notificationId.slice(prefix.length)
     : "";
+  // Prefer Options archive (reads storage directly). Detail page is linked from there.
   const url = chrome.runtime.getURL(
-    id ? `conflict.html?id=${encodeURIComponent(id)}` : "conflict.html",
+    id ? `options.html#alert=${encodeURIComponent(id)}` : "options.html",
   );
   chrome.tabs.create({ url });
 }

@@ -41,6 +41,7 @@ function renderAlerts(conflicts) {
     const cause = c.reasonLabel || conflictReasonLabel(c.reason);
     const article = document.createElement("article");
     article.className = "alert";
+    article.dataset.id = c.id || "";
     article.innerHTML = `
       <header>
         <span class="host">${escapeHtml(c.hostname || "—")}</span>
@@ -71,6 +72,18 @@ async function loadSettings() {
 async function loadAlerts() {
   const conflicts = await listConflicts();
   renderAlerts(conflicts);
+
+  const hash = location.hash.startsWith("#alert=")
+    ? decodeURIComponent(location.hash.slice("#alert=".length))
+    : "";
+  if (!hash) return;
+  const el = [...alertsEl.querySelectorAll(".alert")].find((node) =>
+    node.dataset.id === hash,
+  );
+  if (el) {
+    el.style.outline = "2px solid #154a78";
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 document.getElementById("save").addEventListener("click", async () => {
