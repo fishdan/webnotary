@@ -34,6 +34,51 @@ export function hostnameFromUrl(url) {
   return u.hostname.replace(/\.$/, "").toLowerCase();
 }
 
+/**
+ * Hosts where Chrome often blocks extension webRequest / cert access.
+ * Recheck cannot invent a leaf fingerprint without a successful capture.
+ */
+export function describeCheckBlocker(url) {
+  if (!url || typeof url !== "string") {
+    return { blocked: true, code: "no_url", message: "No active tab URL." };
+  }
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return { blocked: true, code: "bad_url", message: "Tab URL is not parseable." };
+  }
+  if (u.protocol === "chrome:" || u.protocol === "chrome-extension:" || u.protocol === "about:") {
+    return {
+      blocked: true,
+      code: "browser_page",
+      message: "Browser internal pages have no site certificate to check.",
+    };
+  }
+  if (u.protocol !== "https:") {
+    return {
+      blocked: true,
+      code: "not_https",
+      message: "WebNotary only checks https pages.",
+    };
+  }
+  const host = u.hostname.toLowerCase();
+  if (
+    host === "chrome.google.com" ||
+    host.endsWith(".chrome.google.com") ||
+    host === "chromewebstore.google.com" ||
+    host.endsWith(".chromewebstore.google.com")
+  ) {
+    return {
+      blocked: true,
+      code: "restricted_host",
+      message:
+        "Chrome restricts extension certificate access on Chrome Web Store / chrome.google.com pages. Open a normal site (e.g. example.com), reload that tab after installing/reloading WebNotary, then open this popup.",
+    };
+  }
+  return { blocked: false, hostname: host };
+}
+
 /** Extract leaf SHA-256 from webRequest securityInfo details. */
 export function leafFingerprintFromSecurityInfo(securityInfo) {
   if (!securityInfo || securityInfo.state === "insecure") {

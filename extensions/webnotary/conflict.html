@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WebNotary conflict</title>
+  <style>
+    :root {
+      --ink: #10233a;
+      --muted: #5a6b7d;
+      --bad: #b00020;
+      --bg: #f7f9fc;
+      --panel: #fff;
+    }
+    body {
+      margin: 0;
+      font: 14px/1.5 system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    main {
+      max-width: 720px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; color: var(--bad); }
+    h2 { font-size: 15px; margin: 20px 0 8px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid #d7dee8;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .muted { color: var(--muted); }
+    code, .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .fp {
+      display: block;
+      margin: 6px 0;
+      padding: 8px;
+      background: #eef2f7;
+      border-radius: 4px;
+    }
+    button {
+      margin-top: 8px;
+      margin-right: 8px;
+      padding: 6px 10px;
+      border: 1px solid #154a78;
+      background: #154a78;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #fff;
+      color: #154a78;
+    }
+    ul { padding-left: 18px; }
+    li { margin: 8px 0; }
+    a { color: #154a78; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Certificate conflict</h1>
+    <p class="muted" id="lead">Loading…</p>
+    <div class="card" id="detail" hidden></div>
+    <h2>Recent conflicts</h2>
+    <div class="card">
+      <ul id="list"></ul>
+      <p class="muted" id="empty" hidden>No conflicts recorded yet.</p>
+    </div>
+  </main>
+  <script type="module" src="conflict.js"></script>
+</body>
+</html>

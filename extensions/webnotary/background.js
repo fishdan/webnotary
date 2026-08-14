@@ -1,19 +1,116 @@
 import {
   computeExpiresAt,
   getSettings,
+  getTabState,
   getTrust,
   planCheck,
+  putTabState,
   putTrust,
   saveSettings,
 } from "./lib/cache.js";
 import { postCheck } from "./lib/check.js";
 import {
+  conflictReasonLabel,
+  recordConflict,
+} from "./lib/conflicts.js";
+import {
+  describeCheckBlocker,
   hostnameFromUrl,
   leafFingerprintFromSecurityInfo,
 } from "./lib/fingerprint.js";
 
-/** @type {Map<number, { hostname: string, certificateSha256: string, status: string, error?: string, checkedAt: string }>} */
+/** @type {Map<number, object>} */
 const tabState = new Map();
+
+async function rememberTabState(tabId, state) {
+  tabState.set(tabId, state);
+  try {
+    await putTabState(tabId, state);
+  } catch (e) {
+    console.warn("persist tab state failed", e);
+  }
+  return state;
+}
+
+/**
+ * Resolve state for popup/recheck: memory → session → trust cache by tab URL.
+ */
+async function resolveTabState(tabId, tabUrl) {
+  let state = tabState.get(tabId) || (await getTabState(tabId));
+  if (state?.certificateSha256) {
+    tabState.set(tabId, state);
+    return { state, blocker: null };
+  }
+
+  const blocker = describeCheckBlocker(tabUrl);
+  if (blocker.blocked) {
+    return {
+      state: {
+        status: "n/a",
+        hostname: blocker.hostname || tabUrl || "",
+        certificateSha256: "",
+        error: blocker.message,
+        checkedAt: null,
+        cacheReason: blocker.code,
+        needsReload: false,
+        restricted: true,
+      },
+      blocker,
+    };
+  }
+
+  if (state && !state.certificateSha256) {
+    return { state: { ...state, needsReload: true }, blocker: null };
+  }
+
+  try {
+    const hostname = hostnameFromUrl(tabUrl);
+    const trust = await getTrust(hostname);
+    if (trust?.certificateSha256) {
+      const recovered = {
+        hostname,
+        certificateSha256: trust.certificateSha256,
+        status: trust.status,
+        checkedAt: trust.validatedAt,
+        cacheAction: "use_cache",
+        cacheReason: "recovered_from_trust",
+        conflictReason: trust.conflictReason,
+        conflictExplain: trust.conflictReason
+          ? conflictReasonLabel(trust.conflictReason)
+          : undefined,
+        knownCertificateSha256s: trust.knownCertificateSha256s || [],
+        conflictId: trust.conflictId,
+        recovered: true,
+      };
+      await rememberTabState(tabId, recovered);
+      return { state: recovered, blocker: null };
+    }
+    return {
+      state: {
+        status: "n/a",
+        hostname,
+        certificateSha256: "",
+        error:
+          "No certificate captured for this tab yet. Reload the page after installing or reloading WebNotary, then reopen this popup.",
+        checkedAt: null,
+        cacheReason: "needs_reload",
+        needsReload: true,
+      },
+      blocker: null,
+    };
+  } catch (e) {
+    return {
+      state: {
+        status: "n/a",
+        hostname: tabUrl || "",
+        certificateSha256: "",
+        error: e instanceof Error ? e.message : String(e),
+        needsReload: false,
+      },
+      blocker: null,
+    };
+  }
+}
 
 function setBadge(tabId, status) {
   if (tabId < 0) return;
@@ -28,25 +125,111 @@ function setBadge(tabId, status) {
   } else if (status === "conflict") {
     chrome.action.setBadgeText({ tabId, text: "!" });
     chrome.action.setBadgeBackgroundColor({ tabId, color: "#b00020" });
-    chrome.action.setTitle({ tabId, title: "WebNotary: CONFLICT" });
+    chrome.action.setTitle({
+      tabId,
+      title: "WebNotary: CONFLICT — open popup for details",
+    });
   } else {
     chrome.action.setBadgeText({ tabId, text: "" });
     chrome.action.setTitle({ tabId, title: "WebNotary" });
   }
 }
 
-async function maybeNotifyConflict(hostname) {
+function shortFp(fp) {
+  if (!fp || fp.length < 16) return fp || "—";
+  return `${fp.slice(0, 12)}…${fp.slice(-8)}`;
+}
+
+async function maybeNotifyConflict(record) {
+  const known = record.knownCertificateSha256s || [];
+  const knownLine =
+    known.length > 0
+      ? `Known: ${known.map(shortFp).join(", ")}`
+      : "Open WebNotary for full fingerprints.";
+  const message = [
+    conflictReasonLabel(record.reason),
+    `Your browser: ${shortFp(record.certificateSha256)}`,
+    knownLine,
+  ].join("\n");
+
   try {
-    await chrome.notifications.create(`webnotary-conflict-${hostname}`, {
+    const notificationId = `webnotary-conflict:${record.id}`;
+    await chrome.notifications.create(notificationId, {
       type: "basic",
       iconUrl: "icons/icon128.png",
-      title: "WebNotary conflict",
-      message: `Certificate for ${hostname} conflicts with WebNotary evidence.`,
+      title: `WebNotary conflict: ${record.hostname}`,
+      message,
+      contextMessage: "Stays until dismissed — click for details",
       priority: 2,
+      requireInteraction: true,
+      buttons: [{ title: "Open details" }],
     });
   } catch (e) {
     console.warn("notification failed", e);
   }
+}
+
+async function handleConflictResult({
+  hostname,
+  certificateSha256,
+  conflict,
+  tabId,
+  checkedAt,
+}) {
+  const knownCertificateSha256s = conflict?.knownCertificateSha256s || [];
+  const reason = conflict?.reason;
+  const record = await recordConflict({
+    hostname,
+    certificateSha256,
+    knownCertificateSha256s,
+    reason,
+    checkedAt,
+    tabId,
+  });
+  await maybeNotifyConflict(record);
+  return {
+    conflictReason: reason,
+    conflictExplain: conflictReasonLabel(reason),
+    knownCertificateSha256s,
+    conflictId: record.id,
+  };
+}
+
+async function applyCheckResult(settings, stateBase, result, tabId) {
+  const validatedAt = new Date().toISOString();
+  const expiresAt =
+    result.status === "valid"
+      ? computeExpiresAt(settings, validatedAt, undefined)
+      : new Date(Date.now() + settings.recheckCooldownMs).toISOString();
+  await putTrust({
+    hostname: stateBase.hostname,
+    certificateSha256: stateBase.certificateSha256,
+    status: result.status,
+    validatedAt,
+    expiresAt,
+  });
+
+  let conflictFields = {};
+  if (result.status === "conflict") {
+    conflictFields = await handleConflictResult({
+      hostname: stateBase.hostname,
+      certificateSha256: stateBase.certificateSha256,
+      conflict: result.conflict,
+      tabId,
+      checkedAt: validatedAt,
+    });
+  }
+
+  const next = {
+    ...stateBase,
+    status: result.status,
+    checkedAt: validatedAt,
+    ...conflictFields,
+  };
+  tabState.set(tabId, next);
+  setBadge(tabId, result.status);
+  await putTabState(tabId, next);
+  return next;
 }
 
 async function evaluateNavigation(details) {
@@ -59,12 +242,13 @@ async function evaluateNavigation(details) {
     hostname = hostnameFromUrl(details.url);
     certificateSha256 = leafFingerprintFromSecurityInfo(details.securityInfo);
   } catch (e) {
-    tabState.set(details.tabId, {
+    await rememberTabState(details.tabId, {
       hostname: details.url,
       certificateSha256: "",
       status: "n/a",
       error: e instanceof Error ? e.message : String(e),
       checkedAt: new Date().toISOString(),
+      needsReload: false,
     });
     setBadge(details.tabId, null);
     return;
@@ -76,9 +260,18 @@ async function evaluateNavigation(details) {
 
   let status = cached?.status;
   let error;
+  let conflictFields = {};
 
   if (plan.action === "use_cache") {
     status = plan.entry.status;
+    if (status === "conflict") {
+      conflictFields = {
+        conflictReason: cached.conflictReason,
+        conflictExplain: conflictReasonLabel(cached.conflictReason),
+        knownCertificateSha256s: cached.knownCertificateSha256s || [],
+        conflictId: cached.conflictId,
+      };
+    }
   } else {
     try {
       const result = await postCheck(
@@ -94,23 +287,38 @@ async function evaluateNavigation(details) {
           : new Date(
               Date.now() + settings.recheckCooldownMs,
             ).toISOString();
+
+      let extraTrust = {};
+      if (status === "conflict") {
+        conflictFields = await handleConflictResult({
+          hostname,
+          certificateSha256,
+          conflict: result.conflict,
+          tabId: details.tabId,
+          checkedAt: validatedAt,
+        });
+        extraTrust = {
+          conflictReason: conflictFields.conflictReason,
+          knownCertificateSha256s: conflictFields.knownCertificateSha256s,
+          conflictId: conflictFields.conflictId,
+        };
+      }
+
       await putTrust({
         hostname,
         certificateSha256,
         status,
         validatedAt,
         expiresAt,
+        ...extraTrust,
       });
-      if (status === "conflict") {
-        await maybeNotifyConflict(hostname);
-      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       status = "error";
     }
   }
 
-  tabState.set(details.tabId, {
+  await rememberTabState(details.tabId, {
     hostname,
     certificateSha256,
     status: status || "unknown",
@@ -118,13 +326,13 @@ async function evaluateNavigation(details) {
     checkedAt: new Date().toISOString(),
     cacheAction: plan.action,
     cacheReason: plan.reason,
+    ...conflictFields,
   });
   setBadge(details.tabId, status === "error" ? "unknown" : status);
 }
 
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    // Fire-and-forget async work; MV3 webRequest is non-blocking.
     evaluateNavigation(details).catch((err) =>
       console.warn("evaluateNavigation failed", err),
     );
@@ -133,11 +341,35 @@ chrome.webRequest.onHeadersReceived.addListener(
   ["securityInfo"],
 );
 
+function openConflictDetails(notificationId) {
+  const prefix = "webnotary-conflict:";
+  const id = notificationId.startsWith(prefix)
+    ? notificationId.slice(prefix.length)
+    : "";
+  const url = chrome.runtime.getURL(
+    id ? `conflict.html?id=${encodeURIComponent(id)}` : "conflict.html",
+  );
+  chrome.tabs.create({ url });
+}
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  if (!notificationId.startsWith("webnotary-conflict:")) return;
+  openConflictDetails(notificationId);
+  chrome.notifications.clear(notificationId);
+});
+
+chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+  if (!notificationId.startsWith("webnotary-conflict:")) return;
+  if (buttonIndex === 0) openConflictDetails(notificationId);
+  chrome.notifications.clear(notificationId);
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     if (msg?.type === "GET_TAB_STATE") {
       const tabId = msg.tabId;
-      sendResponse({ ok: true, state: tabState.get(tabId) || null });
+      const resolved = await resolveTabState(tabId, msg.tabUrl);
+      sendResponse({ ok: true, state: resolved.state });
       return;
     }
     if (msg?.type === "GET_SETTINGS") {
@@ -149,11 +381,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ ok: true, settings });
       return;
     }
+    if (msg?.type === "LIST_CONFLICTS") {
+      const { listConflicts } = await import("./lib/conflicts.js");
+      sendResponse({ ok: true, conflicts: await listConflicts() });
+      return;
+    }
+    if (msg?.type === "GET_CONFLICT") {
+      const { getConflict } = await import("./lib/conflicts.js");
+      sendResponse({ ok: true, conflict: await getConflict(msg.id) });
+      return;
+    }
+    if (msg?.type === "CLEAR_CONFLICTS") {
+      const { clearConflicts } = await import("./lib/conflicts.js");
+      await clearConflicts();
+      sendResponse({ ok: true });
+      return;
+    }
     if (msg?.type === "RECHECK_TAB") {
-      // Popup-driven recheck uses last known FP for that tab if present.
-      const state = tabState.get(msg.tabId);
+      const resolved = await resolveTabState(msg.tabId, msg.tabUrl);
+      const state = resolved.state;
       if (!state?.hostname || !state.certificateSha256) {
-        sendResponse({ ok: false, error: "no cert state for tab" });
+        sendResponse({
+          ok: false,
+          error:
+            state?.error ||
+            "No certificate for this tab yet. Reload the page, then try Recheck.",
+        });
         return;
       }
       const settings = await getSettings();
@@ -163,28 +416,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           state.hostname,
           state.certificateSha256,
         );
-        const validatedAt = new Date().toISOString();
-        const expiresAt =
-          result.status === "valid"
-            ? computeExpiresAt(settings, validatedAt, undefined)
-            : new Date(Date.now() + settings.recheckCooldownMs).toISOString();
-        await putTrust({
-          hostname: state.hostname,
-          certificateSha256: state.certificateSha256,
-          status: result.status,
-          validatedAt,
-          expiresAt,
-        });
-        const next = {
-          ...state,
-          status: result.status,
-          checkedAt: validatedAt,
-          cacheAction: "check",
-          cacheReason: "manual",
-        };
-        tabState.set(msg.tabId, next);
-        setBadge(msg.tabId, result.status);
-        if (result.status === "conflict") await maybeNotifyConflict(state.hostname);
+        const next = await applyCheckResult(
+          settings,
+          {
+            ...state,
+            cacheAction: "check",
+            cacheReason: "manual",
+          },
+          result,
+          msg.tabId,
+        );
         sendResponse({ ok: true, state: next });
       } catch (e) {
         sendResponse({

@@ -16,7 +16,8 @@
       font: 13px/1.45 system-ui, sans-serif;
       margin: 0;
       padding: 12px 14px;
-      min-width: 280px;
+      min-width: 300px;
+      max-width: 360px;
       color: var(--ink);
       background: var(--bg);
     }
@@ -40,6 +41,26 @@
       font-size: 12px;
     }
     .meta div { margin: 4px 0; }
+    .explain {
+      margin: 8px 0;
+      padding: 8px;
+      background: #fde8ec;
+      border-left: 3px solid var(--bad);
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .hint {
+      margin: 8px 0;
+      padding: 8px;
+      background: #e8eef5;
+      border-left: 3px solid #154a78;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
     button {
       margin-top: 10px;
       width: 100%;
@@ -51,6 +72,12 @@
       font-weight: 600;
       cursor: pointer;
     }
+    button.secondary {
+      background: #fff;
+      color: #154a78;
+      border: 1px solid #154a78;
+      margin-top: 6px;
+    }
     button:disabled { opacity: 0.5; cursor: default; }
     a { color: #154a78; }
   </style>
@@ -58,10 +85,14 @@
 <body>
   <h1>WebNotary</h1>
   <div id="status" class="status">…</div>
+  <div id="explain" class="explain" hidden></div>
+  <div id="hint" class="hint" hidden></div>
   <div class="meta" id="meta"></div>
   <button id="recheck" type="button">Recheck</button>
+  <button id="reload" class="secondary" type="button" hidden>Reload page to capture cert</button>
+  <button id="details" class="secondary" type="button" hidden>Open conflict details</button>
   <p class="meta" style="margin-top:10px">
-    <a href="options.html" target="_blank">Options</a>
+    <a href="options.html" target="_blank">Options / alert archive</a>
   </p>
   <script type="module" src="popup.js"></script>
 </body>

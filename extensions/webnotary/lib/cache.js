@@ -1,5 +1,28 @@
 const SETTINGS_KEY = "webnotary.settings";
 const TRUST_PREFIX = "webnotary.trust.";
+const TAB_STATE_PREFIX = "webnotary.tab.";
+
+function tabStateKey(tabId) {
+  return `${TAB_STATE_PREFIX}${tabId}`;
+}
+
+/** Persist tab check state so Recheck survives service-worker restarts. */
+export async function putTabState(tabId, state) {
+  if (tabId == null || tabId < 0) return;
+  await chrome.storage.session.set({ [tabStateKey(tabId)]: state });
+}
+
+export async function getTabState(tabId) {
+  if (tabId == null || tabId < 0) return null;
+  const key = tabStateKey(tabId);
+  const bag = await chrome.storage.session.get(key);
+  return bag[key] || null;
+}
+
+export async function clearTabState(tabId) {
+  if (tabId == null || tabId < 0) return;
+  await chrome.storage.session.remove(tabStateKey(tabId));
+}
 
 export const DEFAULT_SETTINGS = {
   checkUrl: "https://api.webnotary.org/v1/check",

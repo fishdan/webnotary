@@ -206,6 +206,9 @@
 - Files: `extensions/webnotary/**`, SpecKit `specs/0/0.008-chrome-extension/*`, README flag docs.
 - Out of commit: local `infra/tfplan*` artifacts.
 
-## 2026-08-13 Update – Public root README
+## 2026-08-13 Update – Conflict detail UX
 
-- Summary: Added repo-root `README.md` for GitHub visitors (product question, API curl, extension pointer, architecture, layout). Kept `specs/0/README.md` as SpecKit index and linked it from root (and root from specs/0).
+- Summary: Conflicts were too ephemeral (toast vanished) and showed no fingerprints.
+- API: `/v1/check` conflict responses may include `conflict.reason` + `knownCertificateSha256s` (sibling / stored / acquire).
+- Extension: sticky `requireInteraction` notifications, conflict log page, richer popup with full leaf + known FPs.
+- Branch: `fix/conflict-detail-ux`

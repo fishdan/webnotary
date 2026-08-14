@@ -66,12 +66,23 @@ export function detectConflictFromSiblings(input: {
   clientCertificateSha256: string;
   siblings: SiblingCert[];
 }): boolean {
+  return conflictingObservedFingerprints(input).length > 0;
+}
+
+/** Observed/trusted sibling fingerprints that differ from the client leaf. */
+export function conflictingObservedFingerprints(input: {
+  clientCertificateSha256: string;
+  siblings: SiblingCert[];
+}): string[] {
   const client = input.clientCertificateSha256.toLowerCase();
+  const out: string[] = [];
+  const seen = new Set<string>();
   for (const sibling of input.siblings) {
     if (!OBSERVED_TRUST_STATUSES.has(sibling.status)) continue;
-    if (sibling.certificateSha256.toLowerCase() !== client) {
-      return true;
-    }
+    const fp = sibling.certificateSha256.toLowerCase();
+    if (fp === client || seen.has(fp)) continue;
+    seen.add(fp);
+    out.push(fp);
   }
-  return false;
+  return out;
 }
